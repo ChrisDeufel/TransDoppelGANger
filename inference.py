@@ -51,7 +51,7 @@ g_attr_d_coe = 1.0
 extra_checkpoint_freq = 5
 num_packing = 1
 
-model_dir = "runs/web_11/checkpoint/epoch_360"
+model_dir = "runs/web_12/checkpoint/epoch_70"
 trainer = Trainer(discriminator=discriminator, attr_discriminator=attr_discriminator, generator=generator,
                   criterion=None, dis_optimizer=attr_opt, addi_dis_optimizer=d_attr_opt, gen_optimizer=gen_opt,
                   real_train_dl=None, data_feature_shape=data_feature_shape)

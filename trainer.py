@@ -18,8 +18,8 @@ class Trainer:
                  gen_optimizer,
                  real_train_dl,
                  data_feature_shape,
-                 checkpoint_dir='runs/web_12/checkpoint',
-                 logging_file='runs/web_12/time.log',
+                 checkpoint_dir='runs/test/checkpoint',
+                 logging_file='runs/test/time.log',
                  noise_dim=5,
                  sample_len=10,
                  dis_lambda_gp=10,
@@ -54,6 +54,7 @@ class Trainer:
         self.dis = self.dis.to(self.device)
         self.attr_dis = self.attr_dis.to(self.device)
         self.gen = self.gen.to(self.device)
+        self.EPS = 1e-8
         logging.basicConfig(filename=logging_file, level=logging.DEBUG,
                             format='%(asctime)s:%(message)s')
         handler_sh = logging.StreamHandler(sys.stdout)
@@ -84,10 +85,10 @@ class Trainer:
     def sample_from(self, real_attribute_noise, addi_attribute_noise, feature_input_noise,
                     return_gen_flag_feature=False):
         with torch.no_grad():
-            attributes, addi_attributes, features = self.gen(real_attribute_noise,
-                                                             addi_attribute_noise,
-                                                             feature_input_noise)
-            attributes = torch.cat((attributes, addi_attributes), dim=1)
+            attributes, features = self.gen(real_attribute_noise,
+                                            addi_attribute_noise,
+                                            feature_input_noise)
+            # attributes = torch.cat((attributes, addi_attributes), dim=1)
 
             # TODO: possible without loop?!
             gen_flags = np.zeros(features.shape[:-1])
@@ -140,26 +141,59 @@ class Trainer:
                     real_attribute_noise = self.gen_attribute_input_noise(batch_size).to(self.device)
                     addi_attribute_noise = self.gen_attribute_input_noise(batch_size).to(self.device)
                     feature_input_noise = self.gen_feature_input_noise(batch_size, self.sample_time)
-                    fake_attribute, feature_gen_output = self.gen(real_attribute_noise,
-                                                                                                addi_attribute_noise,
-                                                                                                feature_input_noise)
+                    fake_attribute, fake_feature = self.gen(real_attribute_noise,
+                                                            addi_attribute_noise,
+                                                            feature_input_noise)
 
-                    dis_input_data = torch.cat((data_attribute,
-                                                data_feature.view(-1, data_feature.size(1) * data_feature.size(2))),
-                                               dim=1)
-                    dis_input_fake = torch.cat((fake_attribute,
-                                                feature_gen_output.view(-1,
-                                                                        data_feature.size(1) * data_feature.size(2))),
-                                               dim=1)
-                    dis_real = self.dis(dis_input_data).reshape(-1)
-                    dis_fake = self.dis(dis_input_fake).reshape(-1)
-                    # loss_dis = self.criterion(dis_real, dis_fake)
+                    # discriminator
+                    # dis_input_data = torch.cat((data_attribute,
+                    #                            data_feature.view(-1, data_feature.size(1) * data_feature.size(2))),
+                    #                           dim=1)
+                    # dis_input_fake = torch.cat((fake_attribute,
+                    #                            feature_gen_output.view(-1,
+                    #                                                    data_feature.size(1) * data_feature.size(2))),
+                    #                           dim=1)
+                    dis_real = self.dis(data_feature, data_attribute)
+                    dis_fake = self.dis(fake_feature, fake_attribute)
+
                     loss_dis_fake = torch.mean(dis_fake)
                     loss_dis_real = -torch.mean(dis_real)
-                    loss_dis_gp = gradient_penalty(
-                        disciminator=self.dis, real=dis_input_data, fake=dis_input_fake, device=self.device)
-                    loss_dis = loss_dis_fake + loss_dis_real+self.dis_lambda_gp*loss_dis_gp
 
+                    # calculate gradient penalty
+                    # TODO:    ALL THIS UNFLATTEN STAFF IS ONLY FOR SPECIAL LOSSES (SEE DOPPELGANGER BUILD LOSS)
+                    dis_fake_unflattened = dis_fake
+                    dis_real_unflattened = -dis_real
+                    alpha_dim2 = torch.FloatTensor(batch_size, 1).uniform_(1)
+                    alpha_dim3 = torch.unsqueeze(alpha_dim2, 2)
+                    differences_input_feature = (fake_feature -
+                                                 data_feature)
+                    interpolates_input_feature = (data_feature +
+                                                  alpha_dim3 * differences_input_feature)
+                    differences_input_attribute = (fake_attribute -
+                                                   data_attribute)
+                    interpolates_input_attribute = (data_attribute +
+                                                    (alpha_dim2 *
+                                                     differences_input_attribute))
+                    mixed_scores = self.dis(interpolates_input_feature,
+                                            interpolates_input_attribute)
+                    gradients = torch.autograd.grad(
+                        inputs=[interpolates_input_feature, interpolates_input_attribute],
+                        outputs=mixed_scores,
+                        grad_outputs=torch.ones_like(mixed_scores),
+                        create_graph=True,
+                        retain_graph=True
+                    )
+                    slopes1 = torch.sum(torch.square(gradients[0]),
+                                        dim=(1, 2))
+                    slopes2 = torch.sum(torch.square(gradients[1]),
+                                        dim=(1))
+                    slopes = torch.sqrt(slopes1 + slopes2 + self.EPS)
+                    loss_dis_gp = torch.mean((slopes - 1.) ** 2)
+                    loss_dis_gp_unflattened = (slopes - 1.) ** 2
+                    loss_dis = loss_dis_fake + loss_dis_real + self.dis_lambda_gp * loss_dis_gp
+                    d_loss_unflattened = (dis_fake_unflattened +
+                                          dis_real_unflattened +
+                                          self.dis_lambda_gp * loss_dis_gp_unflattened)
                     self.dis.zero_grad()
                     loss_dis.backward(retain_graph=True)
                     self.dis_opt.step()
@@ -169,14 +203,39 @@ class Trainer:
                     dis_real_rl += loss_dis_real.item()
                     dis_gp_rl += loss_dis_gp.item()
 
-                    #attr_dis_input_fake = torch.cat((real_attribute_output, addi_attribute_output), dim=1)
-                    attr_dis_real = self.attr_dis(data_attribute).reshape(-1)
-                    attr_dis_fake = self.attr_dis(fake_attribute).reshape(-1)
-                    loss_attr_dis_fake = torch.mean(attr_dis_fake)
+                    # attribute discriminator
+                    attr_dis_real = self.attr_dis(data_attribute)
+                    attr_dis_fake = self.attr_dis(fake_attribute)
                     loss_attr_dis_real = -torch.mean(attr_dis_real)
-                    loss_attr_dis_gp = gradient_penalty(
-                        disciminator=self.attr_dis, real=data_attribute, fake=fake_attribute, device=self.device)
-                    loss_attr_dis = loss_attr_dis_fake + loss_attr_dis_real + self.attr_dis_lambda_gp*loss_attr_dis_gp
+                    loss_attr_dis_fake = torch.mean(attr_dis_fake)
+                    # calculate gradient penalty
+                    attr_dis_real_unflattened = -attr_dis_real
+                    attr_dis_fake_unflattened = attr_dis_fake
+                    alpha_dim2 = torch.FloatTensor(batch_size, 1).uniform_(1)
+                    differences_input_attribute = (fake_attribute -
+                                                   data_attribute)
+                    interpolates_input_attribute = (data_attribute +
+                                                    (alpha_dim2 *
+                                                     differences_input_attribute))
+                    mixed_scores = self.attr_dis(interpolates_input_attribute)
+                    gradients = torch.autograd.grad(
+                        inputs=interpolates_input_attribute,
+                        outputs=mixed_scores,
+                        grad_outputs=torch.ones_like(mixed_scores),
+                        create_graph=True,
+                        retain_graph=True
+                    )
+                    slopes1 = torch.sum(torch.square(gradients[0]),
+                                        dim=(1))
+                    slopes = torch.sqrt(slopes1 + self.EPS)
+                    loss_attr_dis_gp = torch.mean((slopes - 1.) ** 2)
+                    loss_attr_dis_gp_unflattened = (slopes - 1.) ** 2
+
+                    loss_attr_dis = loss_attr_dis_fake + loss_attr_dis_real + self.attr_dis_lambda_gp * loss_attr_dis_gp
+                    loss_attr_dis_unflattened = (attr_dis_fake_unflattened +
+                                                 attr_dis_real_unflattened +
+                                                 self.attr_dis_lambda_gp * loss_attr_dis_gp_unflattened)
+
                     self.attr_dis.zero_grad()
                     loss_attr_dis.backward(retain_graph=True)
                     self.attr_dis_opt.step()
@@ -187,11 +246,11 @@ class Trainer:
 
                 # Train Generator: max E[critic(gen_fake)] <-> min -E[critic(gen_fake)]
                 for _ in range(self.g_rounds):
-                    gen_d_fake = self.dis(dis_input_fake).reshape(-1)
+                    gen_d_fake = self.dis(fake_feature, fake_attribute).reshape(-1)
                     gen_attr_d_fake = self.attr_dis(fake_attribute).reshape(-1)
                     loss_gen_d = -torch.mean(gen_d_fake)
                     loss_gen_attr_d = -torch.mean(gen_attr_d_fake)
-                    loss_gen = loss_gen_d + self.g_attr_d_coe*loss_gen_attr_d
+                    loss_gen = loss_gen_d + self.g_attr_d_coe * loss_gen_attr_d
 
                     self.gen.zero_grad()
                     loss_gen.backward()
