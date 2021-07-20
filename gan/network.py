@@ -132,43 +132,63 @@ class DoppelGANgerGenerator(nn.Module):
             self.feature_output_layers.append(nn.Sequential(*modules))
 
     def forward(self, real_attribute_noise, addi_attribute_noise, feature_input_noise):
+        all_attribute = []
+        all_discrete_attribute = []
         # real attribute generator
         real_attribute_gen_output = self.real_attribute_gen(real_attribute_noise)
-        real_attribute_output = torch.zeros((real_attribute_noise.size(0), 0))
-        real_attribute_output_discrete = torch.zeros((real_attribute_noise.size(0), 0))
+        part_attribute = []
+        part_discrete_attribute = []
+        #real_attribute_output = torch.zeros((real_attribute_noise.size(0), 0))
+        #real_attribute_output_discrete = torch.zeros((real_attribute_noise.size(0), 0))
         for attr_layer in self.real_attr_output_layers:
-            output = attr_layer(real_attribute_gen_output)
-
+            sub_output = attr_layer(real_attribute_gen_output)
             if isinstance(attr_layer[-1], nn.Softmax):
-                one_hot = F.one_hot(torch.argmax(output, dim=1), num_classes=output.shape[1])
-                real_attribute_output_discrete = torch.cat((real_attribute_output_discrete, one_hot), dim=1)
+                sub_output_discrete = F.one_hot(torch.argmax(sub_output, dim=1), num_classes=sub_output.shape[1])
+                #real_attribute_output_discrete = torch.cat((real_attribute_output_discrete, sub_output_discrete), dim=1)
             else:
-                real_attribute_output_discrete = torch.cat((real_attribute_output_discrete, output), dim=1)
-
-            real_attribute_output = torch.cat((real_attribute_output, output), dim=1)
-
+                #real_attribute_output_discrete = torch.cat((real_attribute_output_discrete, sub_output), dim=1)
+                sub_output_discrete = sub_output
+            part_attribute.append(sub_output)
+            part_discrete_attribute.append(sub_output_discrete)
+            #real_attribute_output = torch.cat((real_attribute_output, sub_output), dim=1)
+        part_attribute = torch.cat(part_attribute, dim=1)
+        part_discrete_attribute = torch.cat(part_discrete_attribute, dim=1)
+        part_discrete_attribute = part_discrete_attribute.detach()
+        all_attribute.append(part_attribute)
+        all_discrete_attribute.append(part_discrete_attribute)
 
         # create addi attribute generator input
-        addi_attribute_input = torch.cat((real_attribute_output, addi_attribute_noise), dim=1)
+        addi_attribute_input = torch.cat((part_discrete_attribute, addi_attribute_noise), dim=1)
 
         # add attribute generator
         addi_attribute_gen_output = self.addi_attribute_gen(addi_attribute_input)
-        addi_attribute_output = torch.zeros((real_attribute_noise.size(0), 0))
-        addi_attribute_output_discrete = torch.zeros((real_attribute_noise.size(0), 0))
+        #addi_attribute_output = torch.zeros((real_attribute_noise.size(0), 0))
+        #addi_attribute_output_discrete = torch.zeros((real_attribute_noise.size(0), 0))
+        part_attribute = []
+        part_discrete_attribute = []
         for addi_attr_layer in self.addi_attr_output_layers:
-            output = addi_attr_layer(addi_attribute_gen_output)
+            sub_output = addi_attr_layer(addi_attribute_gen_output)
 
             if isinstance(addi_attr_layer[-1], nn.Softmax):
-                one_hot = F.one_hot(torch.argmax(output, dim=1), num_classes=output.shape[1])
-                addi_attribute_output_discrete = torch.cat((addi_attribute_output_discrete, one_hot), dim=1)
+                sub_output_discrete = F.one_hot(torch.argmax(sub_output, dim=1), num_classes=sub_output.shape[1])
+                #addi_attribute_output_discrete = torch.cat((addi_attribute_output_discrete, sub_output_discrete), dim=1)
             else:
-                addi_attribute_output_discrete = torch.cat((addi_attribute_output_discrete, output), dim=1)
-
-            addi_attribute_output = torch.cat((addi_attribute_output, output), dim=1)
-
+                #addi_attribute_output_discrete = torch.cat((addi_attribute_output_discrete, sub_output), dim=1)
+                sub_output_discrete = sub_output
+            part_attribute.append(sub_output)
+            part_discrete_attribute.append(sub_output_discrete)
+            #addi_attribute_output = torch.cat((addi_attribute_output, sub_output), dim=1)
+        part_attribute = torch.cat(part_attribute, dim=1)
+        part_discrete_attribute = torch.cat(part_discrete_attribute, dim=1)
+        part_discrete_attribute = part_discrete_attribute.detach()
+        all_attribute.append(part_attribute)
+        all_discrete_attribute.append(part_discrete_attribute)
+        all_attribute = torch.cat(all_attribute, dim=1)
+        all_discrete_attribute = torch.cat(all_discrete_attribute, dim=1)
+        attribute_output = torch.unsqueeze(all_discrete_attribute, dim=1)
         # create feature generator input
-        attribute_output = torch.unsqueeze(
-            torch.cat((real_attribute_output_discrete, addi_attribute_output_discrete), dim=1), dim=1)
+        #attribute_output = torch.unsqueeze(
+            #torch.cat((real_attribute_output_discrete, addi_attribute_output_discrete), dim=1), dim=1)
         #attribute_output = torch.unsqueeze(
          #   torch.cat((real_attribute_output, addi_attribute_output), dim=1), dim=1)
         attribute_feature_input = torch.cat(feature_input_noise.shape[1] * [attribute_output], dim=1)
@@ -181,14 +201,14 @@ class DoppelGANgerGenerator(nn.Module):
         # feature generator
         feature_rnn_output, _ = self.feature_rnn(feature_gen_input, (h_o, c_0))
 
-        feature_gen_output = torch.zeros((feature_rnn_output.size(0), feature_rnn_output.size(1), 0))
+        features = torch.zeros((feature_rnn_output.size(0), feature_rnn_output.size(1), 0))
         for feature_output_layer in self.feature_output_layers:
-            output = feature_output_layer(feature_rnn_output)
-            feature_gen_output = torch.cat((feature_gen_output, output), dim=2)
+            sub_output = feature_output_layer(feature_rnn_output)
+            features = torch.cat((features, sub_output), dim=2)
 
-        feature_gen_output = torch.reshape(feature_gen_output, (attribute_output.shape[0],
-                                                                int((feature_gen_output.shape[1] *
-                                                                     feature_gen_output.shape[
+        features = torch.reshape(features, (attribute_output.shape[0],
+                                                                int((features.shape[1] *
+                                                                     features.shape[
                                                                          2]) / self.feature_dim), self.feature_dim))
 
-        return real_attribute_output, addi_attribute_output, feature_gen_output
+        return all_attribute, features

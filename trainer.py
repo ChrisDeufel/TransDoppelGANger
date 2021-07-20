@@ -18,8 +18,8 @@ class Trainer:
                  gen_optimizer,
                  real_train_dl,
                  data_feature_shape,
-                 checkpoint_dir='runs/web_11/checkpoint',
-                 logging_file='runs/web_11/time.log',
+                 checkpoint_dir='runs/web_12/checkpoint',
+                 logging_file='runs/web_12/time.log',
                  noise_dim=5,
                  sample_len=10,
                  dis_lambda_gp=10,
@@ -140,14 +140,14 @@ class Trainer:
                     real_attribute_noise = self.gen_attribute_input_noise(batch_size).to(self.device)
                     addi_attribute_noise = self.gen_attribute_input_noise(batch_size).to(self.device)
                     feature_input_noise = self.gen_feature_input_noise(batch_size, self.sample_time)
-                    real_attribute_output, addi_attribute_output, feature_gen_output = self.gen(real_attribute_noise,
+                    fake_attribute, feature_gen_output = self.gen(real_attribute_noise,
                                                                                                 addi_attribute_noise,
                                                                                                 feature_input_noise)
 
                     dis_input_data = torch.cat((data_attribute,
                                                 data_feature.view(-1, data_feature.size(1) * data_feature.size(2))),
                                                dim=1)
-                    dis_input_fake = torch.cat((real_attribute_output, addi_attribute_output,
+                    dis_input_fake = torch.cat((fake_attribute,
                                                 feature_gen_output.view(-1,
                                                                         data_feature.size(1) * data_feature.size(2))),
                                                dim=1)
@@ -169,13 +169,13 @@ class Trainer:
                     dis_real_rl += loss_dis_real.item()
                     dis_gp_rl += loss_dis_gp.item()
 
-                    attr_dis_input_fake = torch.cat((real_attribute_output, addi_attribute_output), dim=1)
+                    #attr_dis_input_fake = torch.cat((real_attribute_output, addi_attribute_output), dim=1)
                     attr_dis_real = self.attr_dis(data_attribute).reshape(-1)
-                    attr_dis_fake = self.attr_dis(attr_dis_input_fake).reshape(-1)
+                    attr_dis_fake = self.attr_dis(fake_attribute).reshape(-1)
                     loss_attr_dis_fake = torch.mean(attr_dis_fake)
                     loss_attr_dis_real = -torch.mean(attr_dis_real)
                     loss_attr_dis_gp = gradient_penalty(
-                        disciminator=self.attr_dis, real=data_attribute, fake=attr_dis_input_fake, device=self.device)
+                        disciminator=self.attr_dis, real=data_attribute, fake=fake_attribute, device=self.device)
                     loss_attr_dis = loss_attr_dis_fake + loss_attr_dis_real + self.attr_dis_lambda_gp*loss_attr_dis_gp
                     self.attr_dis.zero_grad()
                     loss_attr_dis.backward(retain_graph=True)
@@ -188,7 +188,7 @@ class Trainer:
                 # Train Generator: max E[critic(gen_fake)] <-> min -E[critic(gen_fake)]
                 for _ in range(self.g_rounds):
                     gen_d_fake = self.dis(dis_input_fake).reshape(-1)
-                    gen_attr_d_fake = self.attr_dis(attr_dis_input_fake).reshape(-1)
+                    gen_attr_d_fake = self.attr_dis(fake_attribute).reshape(-1)
                     loss_gen_d = -torch.mean(gen_d_fake)
                     loss_gen_attr_d = -torch.mean(gen_attr_d_fake)
                     loss_gen = loss_gen_d + self.g_attr_d_coe*loss_gen_attr_d
