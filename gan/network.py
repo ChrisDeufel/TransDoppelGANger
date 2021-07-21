@@ -151,13 +151,13 @@ class DoppelGANgerGenerator(nn.Module):
             part_discrete_attribute.append(sub_output_discrete)
         part_attribute = torch.cat(part_attribute, dim=1)
         part_discrete_attribute = torch.cat(part_discrete_attribute, dim=1)
-        part_discrete_attribute = part_discrete_attribute.detach()
+        #part_discrete_attribute = part_discrete_attribute.detach()
         all_attribute.append(part_attribute)
         all_discrete_attribute.append(part_discrete_attribute)
 
         # create addi attribute generator input
         addi_attribute_input = torch.cat((part_discrete_attribute, addi_attribute_noise), dim=1)
-
+        #addi_attribute_input = torch.cat((part_attribute, addi_attribute_noise), dim=1)
         # add attribute generator
         addi_attribute_gen_output = self.addi_attribute_gen(addi_attribute_input)
         part_attribute = []
@@ -180,15 +180,16 @@ class DoppelGANgerGenerator(nn.Module):
 
         # create feature generator input
         attribute_output = torch.unsqueeze(all_discrete_attribute, dim=1)
+        #attribute_output = torch.unsqueeze(all_attribute, dim=1)
         attribute_feature_input = torch.cat(feature_input_noise.shape[1] * [attribute_output], dim=1)
         attribute_feature_input = attribute_feature_input.detach()
         feature_gen_input = torch.cat((attribute_feature_input, feature_input_noise), dim=2)
 
         # initial hidden and cell state
-        h_o = torch.randn((self.feature_num_layers, feature_gen_input.size(0), self.feature_num_units))
-        c_0 = torch.randn((self.feature_num_layers, feature_gen_input.size(0), self.feature_num_units))
+        #h_o = torch.randn((self.feature_num_layers, feature_gen_input.size(0), self.feature_num_units))
+        #c_0 = torch.randn((self.feature_num_layers, feature_gen_input.size(0), self.feature_num_units))
         # feature generator
-        feature_rnn_output, _ = self.feature_rnn(feature_gen_input, (h_o, c_0))
+        feature_rnn_output, _ = self.feature_rnn(feature_gen_input)
 
         features = torch.zeros((feature_rnn_output.size(0), feature_rnn_output.size(1), 0))
         for feature_output_layer in self.feature_output_layers:

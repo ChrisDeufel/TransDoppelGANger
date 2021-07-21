@@ -18,8 +18,8 @@ class Trainer:
                  gen_optimizer,
                  real_train_dl,
                  data_feature_shape,
-                 checkpoint_dir='runs/test/checkpoint',
-                 logging_file='runs/test/time.log',
+                 checkpoint_dir='runs/web_17/checkpoint',
+                 logging_file='runs/web_17/time.log',
                  noise_dim=5,
                  sample_len=10,
                  dis_lambda_gp=10,
@@ -84,6 +84,9 @@ class Trainer:
 
     def sample_from(self, real_attribute_noise, addi_attribute_noise, feature_input_noise,
                     return_gen_flag_feature=False):
+        self.dis.eval()
+        self.attr_dis.eval()
+        self.gen.eval()
         with torch.no_grad():
             attributes, features = self.gen(real_attribute_noise,
                                             addi_attribute_noise,
@@ -146,13 +149,6 @@ class Trainer:
                                                             feature_input_noise)
 
                     # discriminator
-                    # dis_input_data = torch.cat((data_attribute,
-                    #                            data_feature.view(-1, data_feature.size(1) * data_feature.size(2))),
-                    #                           dim=1)
-                    # dis_input_fake = torch.cat((fake_attribute,
-                    #                            feature_gen_output.view(-1,
-                    #                                                    data_feature.size(1) * data_feature.size(2))),
-                    #                           dim=1)
                     dis_real = self.dis(data_feature, data_attribute)
                     dis_fake = self.dis(fake_feature, fake_attribute)
 
@@ -246,12 +242,18 @@ class Trainer:
 
                 # Train Generator: max E[critic(gen_fake)] <-> min -E[critic(gen_fake)]
                 for _ in range(self.g_rounds):
-                    gen_d_fake = self.dis(fake_feature, fake_attribute).reshape(-1)
-                    gen_attr_d_fake = self.attr_dis(fake_attribute).reshape(-1)
+                    gen_d_fake = self.dis(fake_feature, fake_attribute)
+                    gen_attr_d_fake = self.attr_dis(fake_attribute)
                     loss_gen_d = -torch.mean(gen_d_fake)
                     loss_gen_attr_d = -torch.mean(gen_attr_d_fake)
                     loss_gen = loss_gen_d + self.g_attr_d_coe * loss_gen_attr_d
 
+                    for layer in self.gen.feature_output_layers:
+                        layer.zero_grad()
+                    for layer in self.gen.addi_attr_output_layers:
+                        layer.zero_grad()
+                    for layer in self.gen.real_attr_output_layers:
+                        layer.zero_grad()
                     self.gen.zero_grad()
                     loss_gen.backward()
                     self.gen_opt.step()

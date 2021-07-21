@@ -29,7 +29,7 @@ generator = DoppelGANgerGenerator(noise_dim=noise_dim, feature_outputs=data_feat
                                   attribute_outputs=data_attribute_outputs,
                                   real_attribute_mask=real_attribute_mask, sample_len=sample_len)
 # define optimizer
-g_lr = 0.001
+g_lr = 0.0001
 g_beta1 = 0.5
 d_lr = 0.001
 d_beta1 = 0.5
@@ -51,7 +51,7 @@ g_attr_d_coe = 1.0
 extra_checkpoint_freq = 5
 num_packing = 1
 
-model_dir = "runs/web_12/checkpoint/epoch_70"
+model_dir = "runs/web_17/checkpoint/epoch_260"
 trainer = Trainer(discriminator=discriminator, attr_discriminator=attr_discriminator, generator=generator,
                   criterion=None, dis_optimizer=attr_opt, addi_dis_optimizer=d_attr_opt, gen_optimizer=gen_opt,
                   real_train_dl=None, data_feature_shape=data_feature_shape)
