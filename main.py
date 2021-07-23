@@ -5,12 +5,15 @@ from data import Data
 from trainer import Trainer
 from gan.network import Discriminator, AttrDiscriminator, DoppelGANgerGenerator
 
-sample_len = 10
+dataset = "FCC_MBA"
+checkpoint_dir = 'runs/FCC_MBA_12/checkpoint'
+logging_file = 'runs/FCC_MBA_12/time.log'
+sample_len = 8
 batch_size = 100
 noise_dim = 5
 # load data
 
-dataset = Data(sample_len=10)
+dataset = Data(sample_len=sample_len, name=dataset)
 real_train_dl = DataLoader(dataset=dataset, batch_size=batch_size, shuffle=True)
 
 # generate discriminators and generator
@@ -19,6 +22,7 @@ attr_discriminator = AttrDiscriminator(dataset.data_attribute)
 generator = DoppelGANgerGenerator(noise_dim=noise_dim, feature_outputs=dataset.data_feature_outputs,
                                   attribute_outputs=dataset.data_attribute_outputs,
                                   real_attribute_mask=dataset.real_attribute_mask, sample_len=sample_len)
+
 # define optimizer
 g_lr = 0.001
 g_beta1 = 0.5
@@ -26,18 +30,10 @@ d_lr = 0.001
 d_beta1 = 0.5
 attr_d_lr = 0.001
 attr_d_beta1 = 0.5
-generator_par = list(generator.parameters())
-
-for layer in generator.feature_output_layers:
-    generator_par += list(layer.parameters())
-for layer in generator.addi_attr_output_layers:
-    generator_par += list(layer.parameters())
-for layer in generator.real_attr_output_layers:
-    generator_par += list(layer.parameters())
 
 attr_opt = torch.optim.Adam(discriminator.parameters(), lr=d_lr, betas=(0.5, 0.999))
 d_attr_opt = torch.optim.Adam(attr_discriminator.parameters(), lr=attr_d_lr, betas=(0.5, 0.999))
-gen_opt = torch.optim.Adam(generator_par, lr=g_lr, betas=(0.5, 0.999))
+gen_opt = torch.optim.Adam(generator.parameters(), lr=g_lr, betas=(0.5, 0.999))
 
 data_feature_shape = dataset.data_feature.shape
 # define Hyperparameters
@@ -52,9 +48,10 @@ g_attr_d_coe = 1.0
 extra_checkpoint_freq = 5
 num_packing = 1
 
-
 trainer = Trainer(discriminator=discriminator, attr_discriminator=attr_discriminator, generator=generator,
                   criterion=None, dis_optimizer=attr_opt, addi_dis_optimizer=d_attr_opt, gen_optimizer=gen_opt,
-                  real_train_dl=real_train_dl, data_feature_shape=data_feature_shape)
+                  real_train_dl=real_train_dl, data_feature_shape=data_feature_shape, checkpoint_dir=checkpoint_dir,
+                  logging_file=logging_file, sample_len=sample_len)
+# model_dir = "runs/web_17/checkpoint/epoch_395"
+# trainer.load(model_dir)
 trainer.train(epochs=epoch, writer_frequency=1, saver_frequency=5)
-

@@ -18,8 +18,8 @@ class Trainer:
                  gen_optimizer,
                  real_train_dl,
                  data_feature_shape,
-                 checkpoint_dir='runs/web_17/checkpoint',
-                 logging_file='runs/web_17/time.log',
+                 checkpoint_dir='runs/web_18/checkpoint',
+                 logging_file='runs/web_18/time.log',
                  noise_dim=5,
                  sample_len=10,
                  dis_lambda_gp=10,
@@ -156,7 +156,7 @@ class Trainer:
                     loss_dis_real = -torch.mean(dis_real)
 
                     # calculate gradient penalty
-                    # TODO:    ALL THIS UNFLATTEN STAFF IS ONLY FOR SPECIAL LOSSES (SEE DOPPELGANGER BUILD LOSS)
+                    # TODO:    ALL THIS UNFLATTEN STUFF IS ONLY FOR SPECIAL LOSSES (SEE DOPPELGANGER BUILD LOSS)
                     dis_fake_unflattened = dis_fake
                     dis_real_unflattened = -dis_real
                     alpha_dim2 = torch.FloatTensor(batch_size, 1).uniform_(1)
@@ -248,12 +248,6 @@ class Trainer:
                     loss_gen_attr_d = -torch.mean(gen_attr_d_fake)
                     loss_gen = loss_gen_d + self.g_attr_d_coe * loss_gen_attr_d
 
-                    for layer in self.gen.feature_output_layers:
-                        layer.zero_grad()
-                    for layer in self.gen.addi_attr_output_layers:
-                        layer.zero_grad()
-                    for layer in self.gen.real_attr_output_layers:
-                        layer.zero_grad()
                     self.gen.zero_grad()
                     loss_gen.backward()
                     self.gen_opt.step()

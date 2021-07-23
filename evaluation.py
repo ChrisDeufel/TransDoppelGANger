@@ -287,7 +287,7 @@ def mse_autocorrelation(real_data_features, sample_data_features, data_feature_o
 
 
 # load web dataset for testing
-dataset = 'web'
+dataset = 'FCC_MBA'
 
 # load original data
 (data_feature, data_attribute, data_gen_flag, data_feature_outputs, data_attribute_outputs) = \
@@ -299,7 +299,7 @@ dataset = 'web'
         normalize_per_sample(data_feature, data_attribute, data_feature_outputs, data_attribute_outputs)
 """
 # load generated data
-sample_path = 'runs/web_17/checkpoint/epoch_260/generated_samples.npz'
+sample_path = 'runs/FCC_MBA_12/checkpoint/epoch_395/generated_samples.npz'
 sampled_data = np.load(sample_path)
 
 sampled_features = sampled_data['sampled_features']
