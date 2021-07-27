@@ -5,7 +5,7 @@ import torch.nn.functional as F
 from output import OutputType, Normalization
 from sklearn import metrics
 from gan.gan_util import init_weights
-
+import logging
 
 # Discriminator
 class Discriminator(nn.Module):
@@ -13,6 +13,8 @@ class Discriminator(nn.Module):
                  scope_name="discriminator", *args, **kwargs):
         super(Discriminator, self).__init__()
         # only saved for adding to summary writer (see trainer.train)
+        self.input_feature_shape = input_feature.shape
+        self.input_attribute_shape = input_attribute.shape
         self.input_size = input_feature.shape[1] * input_feature.shape[2] + input_attribute.shape[1]
         modules = [nn.Linear(self.input_size, num_units), nn.ReLU()]
         for i in range(num_layers - 2):
