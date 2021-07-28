@@ -8,12 +8,12 @@ from gan.network import Discriminator, AttrDiscriminator, DoppelGANgerGenerator
 from util import add_gen_flag, normalize_per_sample
 import os
 
-dataset = "FCC_MBA"
-checkpoint_dir = 'runs/{0}/6/checkpoint'.format(dataset)
+dataset = "web"
+checkpoint_dir = 'runs/{0}/2/checkpoint'.format(dataset)
 if not os.path.exists(checkpoint_dir):
     os.makedirs(checkpoint_dir)
-time_logging_file = 'runs/{0}/6/time.log'.format(dataset)
-config_logging_file = 'runs/{0}/6/config.log'.format(dataset)
+time_logging_file = 'runs/{0}/2/time.log'.format(dataset)
+config_logging_file = 'runs/{0}/2/config.log'.format(dataset)
 # SET UP LOGGING
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
