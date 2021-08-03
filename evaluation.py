@@ -465,27 +465,21 @@ def mse_autocorrelation(dir, real_data_features, sample_data_features, data_feat
     if not os.path.exists(dir):
         os.makedirs(dir)
     feature_dim = 0
-    auto_corrs_real = np.zeros(data_feature.shape[1])
-    auto_corrs_sample = np.zeros(data_feature.shape[1])
     mses = []
     columns = []
     for f in range(len(data_feature_outputs)):
         if data_feature_outputs[f].type_ == output.OutputType.DISCRETE:
             feature_dim += data_feature_outputs[f].dim
             continue
-        for i in range(len(data_feature)):
-            real_feature = np.reshape(real_data_features[i, :, f], (data_feature.shape[1]))
-            sample_feature = np.reshape(sample_data_features[i, :, f], (data_feature.shape[1]))
-            auto_corr_real = autocorr(x=real_feature, nlags=data_feature.shape[1])
-            auto_corr_sample = autocorr(x=sample_feature, nlags=data_feature.shape[1])
-            auto_corrs_real += auto_corr_real
-            auto_corrs_sample += auto_corr_sample
-        auto_corrs_real /= data_feature.shape[0]
-        auto_corrs_sample /= data_feature.shape[0]
-        mse = metrics.mean_squared_error(np.asarray(auto_corrs_real), np.asarray(auto_corrs_sample))
+        real_features = real_data_features[:, :, feature_dim]
+        sample_features = sample_data_features[:, :, feature_dim]
+        real_auto = np.apply_along_axis(func1d=autocorr, axis=1, arr=real_features)
+        sample_auto = np.apply_along_axis(func1d=autocorr, axis=1, arr=sample_features)
+        real_avg_auto = np.mean(real_auto, axis=0)
+        sample_avg_auto = np.mean(sample_auto, axis=0)
+        mse = metrics.mean_squared_error(real_avg_auto, sample_avg_auto)
         mses.append(mse)
         columns.append('feature_{0}'.format(f))
-    mses = np.asarray(mses) / real_data_features.shape[0]
     mses = np.reshape(mses, (1, len(mses)))
     columns = np.asarray(columns)
     df = pd.DataFrame(data=mses, columns=columns)
@@ -493,7 +487,7 @@ def mse_autocorrelation(dir, real_data_features, sample_data_features, data_feat
 
 
 # load web dataset for testing
-dataset = 'FCC_MBA'
+dataset = 'web'
 
 # load original data
 (data_feature, data_attribute, data_gen_flag, data_feature_outputs, data_attribute_outputs) = \
@@ -505,7 +499,7 @@ dataset = 'FCC_MBA'
         normalize_per_sample(data_feature, data_attribute, data_feature_outputs, data_attribute_outputs)
 """
 # load generated data
-sample_path = 'runs/FCC_MBA/6/checkpoint/epoch_395/generated_samples.npz'
+sample_path = 'runs/web/attention_2/checkpoint/epoch_135/generated_samples.npz'
 sampled_data = np.load(sample_path)
 
 sampled_features = sampled_data['sampled_features']
@@ -545,7 +539,7 @@ if not os.path.exists(evaluation_dir):
 
 # call method
 
-#autocorrelation(dir=evaluation_dir, data=data, data_feature_output=data_feature_outputs)
+autocorrelation(dir=evaluation_dir, data=data, data_feature_output=data_feature_outputs)
 
 # sequence_length(dir=evaluation_dir, data=data)
 # cross_measurement(dir=evaluation_dir, data=data, nr_bins=100)
@@ -553,7 +547,7 @@ if not os.path.exists(evaluation_dir):
 #metadata_distribution(dir=evaluation_dir, data=data, attribute_output=data_attribute_outputs)
 # meta_meas_corr(dir=evaluation_dir, data=data, data_attribute_outputs=data_attribute_outputs,
 #                data_feature_outputs=data_feature_outputs)
-nearest_neighbors(dir=evaluation_dir, real_data_features=data_feature, sampled_data_features=sampled_features,
-                 data_feature_outputs=data_feature_outputs)
-#mse_autocorrelation(dir=evaluation_dir, real_data_features=data_feature, sample_data_features=sampled_features,
+# nearest_neighbors(dir=evaluation_dir, real_data_features=data_feature, sampled_data_features=sampled_features,
+#                  data_feature_outputs=data_feature_outputs)
+# mse_autocorrelation(dir=evaluation_dir, real_data_features=data_feature, sample_data_features=sampled_features,
 #                    data_feature_outputs=data_feature_outputs)

@@ -4,16 +4,19 @@ import logging
 from load_data import load_data
 from data import Data, LargeData
 from trainer import Trainer, add_handler_trainer
-from gan.network import Discriminator, AttrDiscriminator, DoppelGANgerGenerator
+# from gan.network import Discriminator, AttrDiscriminator, DoppelGANgerGenerator
+from gan.network_2 import Discriminator, AttrDiscriminator, DoppelGANgerGeneratorAttention, DoppelGANgerGeneratorRNN
 from util import add_gen_flag, normalize_per_sample
 import os
 
-dataset = "FCC_MBA"
-checkpoint_dir = 'runs/{0}/6/checkpoint'.format(dataset)
+device = "cuda" if torch.cuda.is_available() else "cpu"
+#device = 'cpu'
+dataset = "web"
+checkpoint_dir = 'runs/{0}/attention_2/checkpoint'.format(dataset)
 if not os.path.exists(checkpoint_dir):
     os.makedirs(checkpoint_dir)
-time_logging_file = 'runs/{0}/6/time.log'.format(dataset)
-config_logging_file = 'runs/{0}/6/config.log'.format(dataset)
+time_logging_file = 'runs/{0}/attention_2/time.log'.format(dataset)
+config_logging_file = 'runs/{0}/attention_2/config.log'.format(dataset)
 # SET UP LOGGING
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
@@ -33,13 +36,16 @@ config_handler.setLevel(logging.INFO)
 config_handler.setFormatter(config_formatter)
 logger.addHandler(config_handler)
 
-
-sample_len = 8
+sample_len = 10
 batch_size = 100
 noise_dim = 5
+attn_mask = True
+num_heads = 1
 logger.info("Sample Length: {0}".format(sample_len))
 logger.info("Batch Size: {0}".format(batch_size))
 logger.info("Noise Dimension: {0}".format(noise_dim))
+logger.info("Attention Mask: {0}".format(attn_mask))
+logger.info("Number of Attention Heads: {0}".format(num_heads))
 # load data
 dataset = Data(sample_len=sample_len, name=dataset)
 real_train_dl = DataLoader(dataset=dataset, batch_size=batch_size, shuffle=True)
@@ -49,9 +55,10 @@ discriminator = Discriminator(dataset.data_feature, dataset.data_attribute)
 logger.info("DISCRIMINATOR: {0}".format(discriminator))
 attr_discriminator = AttrDiscriminator(dataset.data_attribute)
 logger.info("ATTRIBUTE DISCRIMINATOR: {0}".format(attr_discriminator))
-generator = DoppelGANgerGenerator(noise_dim=noise_dim, feature_outputs=dataset.data_feature_outputs,
-                                  attribute_outputs=dataset.data_attribute_outputs,
-                                  real_attribute_mask=dataset.real_attribute_mask, sample_len=sample_len)
+generator = DoppelGANgerGeneratorAttention(noise_dim=noise_dim, feature_outputs=dataset.data_feature_outputs,
+                                           attribute_outputs=dataset.data_attribute_outputs,
+                                           real_attribute_mask=dataset.real_attribute_mask, device=device,
+                                           sample_len=sample_len)
 logger.info("GENERATOR: {0}".format(generator))
 # define optimizer
 g_lr = 0.001
@@ -82,10 +89,9 @@ logger.info("attr_d_gp_coefficient: {0}".format(attr_d_gp_coe))
 g_attr_d_coe = 1.0
 logger.info("g_attr_d_coe: {0}".format(g_attr_d_coe))
 
-
-
 trainer = Trainer(discriminator=discriminator, attr_discriminator=attr_discriminator, generator=generator,
                   criterion=None, dis_optimizer=attr_opt, addi_dis_optimizer=d_attr_opt, gen_optimizer=gen_opt,
-                  real_train_dl=real_train_dl, data_feature_shape=data_feature_shape, checkpoint_dir=checkpoint_dir,
+                  real_train_dl=real_train_dl, data_feature_shape=data_feature_shape, device=device,
+                  checkpoint_dir=checkpoint_dir,
                   logging_file=time_logging_file, sample_len=sample_len)
 trainer.train(epochs=epoch, writer_frequency=1, saver_frequency=5)

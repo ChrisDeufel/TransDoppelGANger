@@ -6,11 +6,13 @@ from gan.network import Discriminator, AttrDiscriminator, DoppelGANgerGenerator
 from load_data import load_data
 from util import normalize_per_sample, add_gen_flag
 
-sample_len = 8
+#device = "cuda" if torch.cuda.is_available() else "cpu"
+device = 'cpu'
+sample_len = 10
 batch_size = 100
 noise_dim = 5
 # load data
-dataset = 'FCC_MBA'
+dataset = 'web'
 
 (data_feature, data_attribute,
  data_gen_flag,
@@ -27,7 +29,7 @@ discriminator = Discriminator(data_feature, data_attribute)
 attr_discriminator = AttrDiscriminator(data_attribute)
 generator = DoppelGANgerGenerator(noise_dim=noise_dim, feature_outputs=data_feature_outputs,
                                   attribute_outputs=data_attribute_outputs,
-                                  real_attribute_mask=real_attribute_mask, sample_len=sample_len)
+                                  real_attribute_mask=real_attribute_mask, device=device, sample_len=sample_len)
 # define optimizer
 g_lr = 0.001
 g_beta1 = 0.5
@@ -51,17 +53,14 @@ g_attr_d_coe = 1.0
 extra_checkpoint_freq = 5
 num_packing = 1
 
-model_dir = "runs/FCC_MBA/6/checkpoint/epoch_395"
+model_dir = "runs/web/attention_2/checkpoint/epoch_135"
 trainer = Trainer(discriminator=discriminator, attr_discriminator=attr_discriminator, generator=generator,
                   criterion=None, dis_optimizer=attr_opt, addi_dis_optimizer=d_attr_opt, gen_optimizer=gen_opt,
-                  real_train_dl=None, data_feature_shape=data_feature_shape, sample_len=sample_len)
+                  real_train_dl=None, data_feature_shape=data_feature_shape, device=device, sample_len=sample_len)
 trainer.load(model_dir)
 
 
 # start sampling
-real_attribute_input_noise = trainer.gen_attribute_input_noise(batch_size)
-addi_attribute_input_noise = trainer.gen_attribute_input_noise(batch_size)
-feature_input_noise = trainer.gen_feature_input_noise(batch_size, trainer.sample_time)
 # for the start we want to 'produce' as many samples as we have data available
 rounds = data_attribute.shape[0] // batch_size
 sampled_features = np.zeros((0, data_feature.shape[1], data_feature.shape[2] - 2))
@@ -69,9 +68,9 @@ sampled_attributes = np.zeros((0, data_attribute.shape[1]))
 sampled_gen_flags = np.zeros((0, data_feature.shape[1]))
 sampled_lengths = np.zeros(0)
 for i in range(rounds):
-    real_attribute_input_noise = trainer.gen_attribute_input_noise(batch_size)
-    addi_attribute_input_noise = trainer.gen_attribute_input_noise(batch_size)
-    feature_input_noise = trainer.gen_feature_input_noise(batch_size, trainer.sample_time)
+    real_attribute_input_noise = trainer.gen_attribute_input_noise(batch_size).to(device)
+    addi_attribute_input_noise = trainer.gen_attribute_input_noise(batch_size).to(device)
+    feature_input_noise = trainer.gen_feature_input_noise(batch_size, trainer.sample_time).to(device)
     features, attributes, gen_flags, lengths = trainer.sample_from(real_attribute_input_noise,
                                                                    addi_attribute_input_noise,
                                                                    feature_input_noise)

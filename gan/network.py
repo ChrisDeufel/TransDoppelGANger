@@ -57,6 +57,7 @@ class DoppelGANgerGenerator(nn.Module):
                  attribute_num_units=100, attribute_num_layers=3, feature_num_units=100,
                  feature_num_layers=1, scope_name="DoppelGANgerGenerator", *args, **kwargs):
         super(DoppelGANgerGenerator, self).__init__()
+        self.device = "cuda" if torch.cuda.is_available() else "cpu"
         self.feature_num_units = feature_num_units
         self.feature_num_layers = feature_num_layers
         # calculate dimensions
@@ -118,7 +119,8 @@ class DoppelGANgerGenerator(nn.Module):
                                    hidden_size=feature_num_units,
                                    num_layers=feature_num_layers,
                                    batch_first=True)
-
+        # initialize weights
+        self.feature_rnn.apply(init_weights)
         # create feature output layers
         self.feature_output_layers = nn.ModuleList()
         feature_counter = 0
@@ -191,12 +193,12 @@ class DoppelGANgerGenerator(nn.Module):
         feature_gen_input = torch.cat((attribute_feature_input, feature_input_noise), dim=2)
 
         # initial hidden and cell state
-        h_o = torch.randn((self.feature_num_layers, feature_gen_input.size(0), self.feature_num_units))
-        c_0 = torch.randn((self.feature_num_layers, feature_gen_input.size(0), self.feature_num_units))
+        h_o = torch.randn((self.feature_num_layers, feature_gen_input.size(0), self.feature_num_units)).to(self.device)
+        c_0 = torch.randn((self.feature_num_layers, feature_gen_input.size(0), self.feature_num_units)).to(self.device)
         # feature generator
         feature_rnn_output, _ = self.feature_rnn(feature_gen_input, (h_o, c_0))
         # feature_rnn_output, _ = self.feature_rnn(feature_gen_input)
-        features = torch.zeros((feature_rnn_output.size(0), feature_rnn_output.size(1), 0))
+        features = torch.zeros((feature_rnn_output.size(0), feature_rnn_output.size(1), 0)).to(self.device)
         for feature_output_layer in self.feature_output_layers:
             sub_output = feature_output_layer(feature_rnn_output)
             features = torch.cat((features, sub_output), dim=2)

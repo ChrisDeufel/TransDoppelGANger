@@ -7,6 +7,7 @@ import numpy as np
 import torch.nn.functional as F
 import torch.nn as nn
 
-x = (33, 4, 5)
 
-print(x[2])
+
+print(torch.cuda.is_available())
+print(torch.version.cuda)

@@ -26,6 +26,7 @@ class Trainer:
                  gen_optimizer,
                  real_train_dl,
                  data_feature_shape,
+                 device,
                  checkpoint_dir='runs/web_18/checkpoint',
                  logging_file='runs/web_18/time.log',
                  noise_dim=5,
@@ -44,6 +45,7 @@ class Trainer:
         self.attr_dis_opt = addi_dis_optimizer
         self.gen_opt = gen_optimizer
         self.real_train_dl = real_train_dl
+        self.data_feature_shape = data_feature_shape
         if data_feature_shape[1] % sample_len != 0:
             raise Exception("length must be a multiple of sample_len")
         self.sample_time = int(data_feature_shape[1] / sample_len)
@@ -58,16 +60,11 @@ class Trainer:
         if not os.path.exists(checkpoint_dir):
             os.makedirs(checkpoint_dir)
         self.writer = SummaryWriter(checkpoint_dir)
-        self.device = "cuda" if torch.cuda.is_available() else "cpu"
+        self.device = device
         self.dis = self.dis.to(self.device)
         self.attr_dis = self.attr_dis.to(self.device)
         self.gen = self.gen.to(self.device)
         self.EPS = 1e-8
-        # logging.basicConfig(filename=logging_file, level=logging.DEBUG,
-        #                    format='%(asctime)s:%(message)s')
-        # handler_sh = logging.StreamHandler(sys.stdout)
-        # handler_sh.setFormatter(logging.Formatter('%(asctime)s:%(message)s'))
-        # logging.getLogger().addHandler(handler_sh)
         # self.criterion = self.criterion.to(self.device)
 
     def gen_attribute_input_noise(self, num_sample):
@@ -82,6 +79,30 @@ class Trainer:
         torch.save(self.dis, "{0}/epoch_{1}/discriminator.pth".format(self.checkpoint_dir, epoch))
         torch.save(self.attr_dis, "{0}/epoch_{1}/attr_discriminator.pth".format(self.checkpoint_dir, epoch))
         torch.save(self.gen, "{0}/epoch_{1}/generator.pth".format(self.checkpoint_dir, epoch))
+
+    def inference(self, data_attribute, epoch, model_dir=None):
+        if model_dir is None:
+            model_dir = "{0}/epoch_{1}".format(self.checkpoint_dir, epoch)
+        batch_size = data_attribute.shape[0]
+        rounds = self.data_feature_shape[0] // batch_size
+        sampled_features = np.zeros((0, self.data_feature_shape[1], self.data_feature_shape[2] - 2))
+        sampled_attributes = np.zeros((0, data_attribute.shape[1]))
+        sampled_gen_flags = np.zeros((0, self.data_feature_shape[1]))
+        sampled_lengths = np.zeros(0)
+        for i in range(rounds):
+            real_attribute_input_noise = self.gen_attribute_input_noise(batch_size).to(self.device)
+            addi_attribute_input_noise = self.gen_attribute_input_noise(batch_size).to(self.device)
+            feature_input_noise = self.gen_feature_input_noise(batch_size, self.sample_time).to(self.device)
+            features, attributes, gen_flags, lengths = self.sample_from(real_attribute_input_noise,
+                                                                        addi_attribute_input_noise,
+                                                                        feature_input_noise)
+            sampled_features = np.concatenate((sampled_features, features), axis=0)
+            sampled_attributes = np.concatenate((sampled_attributes, attributes), axis=0)
+            sampled_gen_flags = np.concatenate((sampled_gen_flags, gen_flags), axis=0)
+            sampled_lengths = np.concatenate((sampled_lengths, lengths), axis=0)
+        np.savez("{0}/generated_samples.npz".format(model_dir), sampled_features=sampled_features,
+                 sampled_attributes=sampled_attributes, sampled_gen_flags=sampled_gen_flags,
+                 sampled_lengths=sampled_lengths)
 
     def load(self, model_dir=None):
         if not os.path.exists(model_dir):
@@ -106,12 +127,12 @@ class Trainer:
             lengths = np.zeros(features.shape[0])
             for i in range(len(features)):
                 sample_gen = features[i, :, -1]
-                argmax = np.argmax(sample_gen)
+                argmax = np.argmax(sample_gen.cpu())
                 gen_flags[i, :argmax] = 1
                 lengths[i] = argmax
             if not return_gen_flag_feature:
                 features = features[:, :, :-2]
-        return features.numpy(), attributes.numpy(), gen_flags, lengths
+        return features.cpu().numpy(), attributes.cpu().numpy(), gen_flags, lengths
 
     def train(self, epochs, writer_frequency=1, saver_frequency=10):
         self.dis.train()
@@ -153,7 +174,7 @@ class Trainer:
                 for _ in range(self.d_rounds):
                     real_attribute_noise = self.gen_attribute_input_noise(batch_size).to(self.device)
                     addi_attribute_noise = self.gen_attribute_input_noise(batch_size).to(self.device)
-                    feature_input_noise = self.gen_feature_input_noise(batch_size, self.sample_time)
+                    feature_input_noise = self.gen_feature_input_noise(batch_size, self.sample_time).to(self.device)
                     fake_attribute, fake_feature = self.gen(real_attribute_noise,
                                                             addi_attribute_noise,
                                                             feature_input_noise)
@@ -169,8 +190,8 @@ class Trainer:
                     # TODO:    ALL THIS UNFLATTEN STUFF IS ONLY FOR SPECIAL LOSSES (SEE DOPPELGANGER BUILD LOSS)
                     dis_fake_unflattened = dis_fake
                     dis_real_unflattened = -dis_real
-                    alpha_dim2 = torch.FloatTensor(batch_size, 1).uniform_(1)
-                    alpha_dim3 = torch.unsqueeze(alpha_dim2, 2)
+                    alpha_dim2 = torch.FloatTensor(batch_size, 1).uniform_(1).to(self.device)
+                    alpha_dim3 = torch.unsqueeze(alpha_dim2, 2).to(self.device)
                     differences_input_feature = (fake_feature -
                                                  data_feature)
                     interpolates_input_feature = (data_feature +
@@ -217,7 +238,7 @@ class Trainer:
                     # calculate gradient penalty
                     attr_dis_real_unflattened = -attr_dis_real
                     attr_dis_fake_unflattened = attr_dis_fake
-                    alpha_dim2 = torch.FloatTensor(batch_size, 1).uniform_(1)
+                    alpha_dim2 = torch.FloatTensor(batch_size, 1).uniform_(1).to(self.device)
                     differences_input_attribute = (fake_attribute -
                                                    data_attribute)
                     interpolates_input_attribute = (data_attribute +
@@ -305,4 +326,5 @@ class Trainer:
             # save model
             if epoch % saver_frequency == 0:
                 self.save(epoch)
+                self.inference(data_attribute, epoch)
         self.writer.close()

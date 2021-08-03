@@ -1,0 +1,12 @@
+PC -> parent class
+arguments:
+
+noise_dim		-> PC
+feature_outputs
+attribute_outputs	-> PC
+real_attribute_mask	-> PC
+sample_len
+attribute_num_units	-> PC
+attribute_num_layers	-> PC
+feature_num_units
+feature_num_layers
