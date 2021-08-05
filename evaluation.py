@@ -499,7 +499,7 @@ dataset = 'web'
         normalize_per_sample(data_feature, data_attribute, data_feature_outputs, data_attribute_outputs)
 """
 # load generated data
-sample_path = 'runs/web/attention_2/checkpoint/epoch_135/generated_samples.npz'
+sample_path = 'runs/web/attention_12/checkpoint/epoch_10/generated_samples.npz'
 sampled_data = np.load(sample_path)
 
 sampled_features = sampled_data['sampled_features']

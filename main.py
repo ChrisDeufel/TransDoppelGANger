@@ -12,11 +12,11 @@ import os
 device = "cuda" if torch.cuda.is_available() else "cpu"
 #device = 'cpu'
 dataset = "web"
-checkpoint_dir = 'runs/{0}/attention_2/checkpoint'.format(dataset)
+checkpoint_dir = 'runs/{0}/attention_12/checkpoint'.format(dataset)
 if not os.path.exists(checkpoint_dir):
     os.makedirs(checkpoint_dir)
-time_logging_file = 'runs/{0}/attention_2/time.log'.format(dataset)
-config_logging_file = 'runs/{0}/attention_2/config.log'.format(dataset)
+time_logging_file = 'runs/{0}/attention_12/time.log'.format(dataset)
+config_logging_file = 'runs/{0}/attention_12/config.log'.format(dataset)
 # SET UP LOGGING
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
@@ -40,7 +40,7 @@ sample_len = 10
 batch_size = 100
 noise_dim = 5
 attn_mask = True
-num_heads = 1
+num_heads = 4
 logger.info("Sample Length: {0}".format(sample_len))
 logger.info("Batch Size: {0}".format(batch_size))
 logger.info("Noise Dimension: {0}".format(noise_dim))
@@ -94,4 +94,4 @@ trainer = Trainer(discriminator=discriminator, attr_discriminator=attr_discrimin
                   real_train_dl=real_train_dl, data_feature_shape=data_feature_shape, device=device,
                   checkpoint_dir=checkpoint_dir,
                   logging_file=time_logging_file, sample_len=sample_len)
-trainer.train(epochs=epoch, writer_frequency=1, saver_frequency=5)
+trainer.train(epochs=epoch, writer_frequency=1, saver_frequency=10)

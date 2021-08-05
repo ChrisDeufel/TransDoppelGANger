@@ -6,13 +6,13 @@ from gan.network import Discriminator, AttrDiscriminator, DoppelGANgerGenerator
 from load_data import load_data
 from util import normalize_per_sample, add_gen_flag
 
-#device = "cuda" if torch.cuda.is_available() else "cpu"
-device = 'cpu'
-sample_len = 10
+device = "cuda" if torch.cuda.is_available() else "cpu"
+#device = 'cpu'
+sample_len = 1
 batch_size = 100
 noise_dim = 5
 # load data
-dataset = 'web'
+dataset = 'FCC_MBA'
 
 (data_feature, data_attribute,
  data_gen_flag,
@@ -53,7 +53,7 @@ g_attr_d_coe = 1.0
 extra_checkpoint_freq = 5
 num_packing = 1
 
-model_dir = "runs/web/attention_2/checkpoint/epoch_135"
+model_dir = "runs/FCC_MBA/attention_17/checkpoint/epoch_395"
 trainer = Trainer(discriminator=discriminator, attr_discriminator=attr_discriminator, generator=generator,
                   criterion=None, dis_optimizer=attr_opt, addi_dis_optimizer=d_attr_opt, gen_optimizer=gen_opt,
                   real_train_dl=None, data_feature_shape=data_feature_shape, device=device, sample_len=sample_len)

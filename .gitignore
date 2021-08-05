@@ -1,4 +1,5 @@
 .idea/
+evaluation/
 data/
 __pycache__/
 runs/
