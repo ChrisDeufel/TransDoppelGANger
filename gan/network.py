@@ -193,16 +193,31 @@ class DoppelGANgerGenerator(nn.Module):
         feature_gen_input = torch.cat((attribute_feature_input, feature_input_noise), dim=2)
 
         # initial hidden and cell state
-        h_o = torch.randn((self.feature_num_layers, feature_gen_input.size(0), self.feature_num_units)).to(self.device)
-        c_0 = torch.randn((self.feature_num_layers, feature_gen_input.size(0), self.feature_num_units)).to(self.device)
+        h_o = torch.randn((self.feature_num_layers, feature_gen_input.size(0), self.feature_num_units))
+        c_0 = torch.randn((self.feature_num_layers, feature_gen_input.size(0), self.feature_num_units))
         # feature generator
         feature_rnn_output, _ = self.feature_rnn(feature_gen_input, (h_o, c_0))
         # feature_rnn_output, _ = self.feature_rnn(feature_gen_input)
-        features = torch.zeros((feature_rnn_output.size(0), feature_rnn_output.size(1), 0)).to(self.device)
+        features = torch.zeros((feature_rnn_output.size(0), feature_rnn_output.size(1), 0))
         for feature_output_layer in self.feature_output_layers:
             sub_output = feature_output_layer(feature_rnn_output)
             features = torch.cat((features, sub_output), dim=2)
-
+        # calculate average mse
+        features_num = np.asarray(features)
+        mse_col = 0
+        mse_row = 0
+        for i in range(len(features)):
+            sample = features_num[i, :, :]
+            for col in range(sample.shape[1]):
+                mse_col += np.std(sample[:, col])
+            for row in range(sample.shape[0]):
+                mse_row += np.std(sample[row, :])
+            mse_col /= sample.shape[1]
+            mse_row /= sample.shape[0]
+        mse_col /= len(features)
+        mse_row /= len(features)
+        print("col: {}".format(mse_col))
+        print("row: {}".format(mse_row))
         features = torch.reshape(features, (attribute_output.shape[0],
                                             int((features.shape[1] *
                                                  features.shape[

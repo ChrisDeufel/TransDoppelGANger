@@ -2,17 +2,18 @@ from torch.utils.data import DataLoader
 import torch
 import numpy as np
 from trainer import Trainer
-from gan.network import Discriminator, AttrDiscriminator, DoppelGANgerGenerator
+from gan.network_2 import Discriminator, AttrDiscriminator, DoppelGANgerGeneratorRNN, DoppelGANgerGeneratorAttention
+#from gan.network import Discriminator, AttrDiscriminator, DoppelGANgerGenerator
 from load_data import load_data
 from util import normalize_per_sample, add_gen_flag
 
-device = "cuda" if torch.cuda.is_available() else "cpu"
-#device = 'cpu'
-sample_len = 1
+#device = "cuda" if torch.cuda.is_available() else "cpu"
+device = 'cpu'
+sample_len = 10
 batch_size = 100
 noise_dim = 5
 # load data
-dataset = 'FCC_MBA'
+dataset = 'web'
 
 (data_feature, data_attribute,
  data_gen_flag,
@@ -27,7 +28,7 @@ data_feature, data_feature_outputs = add_gen_flag(data_feature, data_gen_flag, d
 # generate discriminators and generator
 discriminator = Discriminator(data_feature, data_attribute)
 attr_discriminator = AttrDiscriminator(data_attribute)
-generator = DoppelGANgerGenerator(noise_dim=noise_dim, feature_outputs=data_feature_outputs,
+generator = DoppelGANgerGeneratorRNN(noise_dim=noise_dim, feature_outputs=data_feature_outputs,
                                   attribute_outputs=data_attribute_outputs,
                                   real_attribute_mask=real_attribute_mask, device=device, sample_len=sample_len)
 # define optimizer
@@ -53,7 +54,7 @@ g_attr_d_coe = 1.0
 extra_checkpoint_freq = 5
 num_packing = 1
 
-model_dir = "runs/FCC_MBA/attention_17/checkpoint/epoch_395"
+model_dir = "runs/web/1/checkpoint/epoch_380"
 trainer = Trainer(discriminator=discriminator, attr_discriminator=attr_discriminator, generator=generator,
                   criterion=None, dis_optimizer=attr_opt, addi_dis_optimizer=d_attr_opt, gen_optimizer=gen_opt,
                   real_train_dl=None, data_feature_shape=data_feature_shape, device=device, sample_len=sample_len)

@@ -125,7 +125,8 @@ class DoppelGANgerGenerator(nn.Module):
         for attr_layer in self.real_attr_output_layers:
             sub_output = attr_layer(real_attribute_gen_output)
             if isinstance(attr_layer[-1], nn.Softmax):
-                sub_output_discrete = F.one_hot(torch.argmax(sub_output, dim=1), num_classes=sub_output.shape[1])
+                sub_output = F.one_hot(torch.argmax(sub_output, dim=1), num_classes=sub_output.shape[1])
+                sub_output_discrete = sub_output
             else:
                 sub_output_discrete = sub_output
             part_attribute.append(sub_output)
@@ -160,7 +161,8 @@ class DoppelGANgerGenerator(nn.Module):
         all_discrete_attribute = torch.cat(all_discrete_attribute, dim=1)
 
         # create feature generator input
-        attribute_output = torch.unsqueeze(all_discrete_attribute, dim=1)
+        all_discrete_attribute = torch.unsqueeze(all_discrete_attribute, dim=1)
+        attribute_output = all_discrete_attribute
         attribute_feature_input = torch.cat(feature_input_noise.shape[1] * [attribute_output], dim=1)
         attribute_feature_input = attribute_feature_input.detach()
         feature_gen_input = torch.cat((attribute_feature_input, feature_input_noise), dim=2)
@@ -174,6 +176,7 @@ class DoppelGANgerGeneratorRNN(DoppelGANgerGenerator):
         super().__init__(noise_dim, attribute_outputs, real_attribute_mask, device, attribute_num_units,
                          attribute_num_layers,
                          scope_name)
+        self.device = device
         self.feature_dim = 0
         for feature in feature_outputs:
             self.feature_dim += feature.dim
@@ -228,26 +231,26 @@ class DoppelGANgerGeneratorRNN(DoppelGANgerGenerator):
         return all_attribute, features
 
 
-class PositionalEncoding(nn.Module):
-
-    def __init__(self, d_model, max_len=5000):
-        super(PositionalEncoding, self).__init__()
-        pe = torch.zeros(max_len, d_model)
-        position = torch.arange(0, max_len, dtype=torch.float).unsqueeze(1)
-        div_term = torch.exp(torch.arange(0, d_model, 2).float() * (-math.log(10000.0) / d_model))
-        if d_model % 2 != 0:
-            div_term_cos = torch.exp(torch.arange(0, d_model - 1, 2).float() * (-math.log(10000.0) / d_model))
-        else:
-            div_term_cos = div_term
-        pe[:, 0::2] = torch.sin(position * div_term)
-        pe[:, 1::2] = torch.cos(position * div_term_cos)
-        pe = pe.unsqueeze(0).transpose(0, 1)
-        self.register_buffer('pe', pe)
-
-    def forward(self, x):
-        x = x + self.pe[:x.size(0), :]
-        return x
-
+# class PositionalEncoding(nn.Module):
+#
+#     def __init__(self, d_model, max_len=5000):
+#         super(PositionalEncoding, self).__init__()
+#         pe = torch.zeros(max_len, d_model)
+#         position = torch.arange(0, max_len, dtype=torch.float).unsqueeze(1)
+#         div_term = torch.exp(torch.arange(0, d_model, 2).float() * (-math.log(10000.0) / d_model))
+#         if d_model % 2 != 0:
+#             div_term_cos = torch.exp(torch.arange(0, d_model - 1, 2).float() * (-math.log(10000.0) / d_model))
+#         else:
+#             div_term_cos = div_term
+#         pe[:, 0::2] = torch.sin(position * div_term)
+#         pe[:, 1::2] = torch.cos(position * div_term_cos)
+#         pe = pe.unsqueeze(0).transpose(0, 1)
+#         self.register_buffer('pe', pe)
+#
+#     def forward(self, x):
+#         x = x + self.pe[:x.size(0), :]
+#         return x
+#
 
 #
 # class ScaledDotProductAttention(nn.Module):
@@ -444,9 +447,35 @@ class PositionalEncoding(nn.Module):
 #         return result
 #
 
+class PositionalEncoding(nn.Module):
+
+    def __init__(self, d_model: int, dropout: float = 0.0, max_len: int = 5000):
+        super().__init__()
+        self.dropout = nn.Dropout(p=dropout)
+
+        position = torch.arange(max_len).unsqueeze(1)
+        div_term = torch.exp(torch.arange(0, d_model, 2) * (-math.log(10000.0) / d_model))
+        if d_model % 2 != 0:
+            div_term_cos = torch.exp(torch.arange(0, d_model - 1, 2).float() * (-math.log(10000.0) / d_model))
+        else:
+            div_term_cos = div_term
+        pe = torch.zeros(max_len, 1, d_model)
+        pe[:, 0, 0::2] = torch.sin(position * div_term)
+        pe[:, 0, 1::2] = torch.cos(position * div_term_cos)
+        self.register_buffer('pe', pe)
+
+    def forward(self, x):
+        """
+        Args:
+            x: Tensor, shape [seq_len, batch_size, embedding_dim]
+        """
+        x = x + self.pe[:x.size(0)]
+        return self.dropout(x)
+
+
 class DoppelGANgerGeneratorAttention(DoppelGANgerGenerator):
     def __init__(self, noise_dim, feature_outputs, attribute_outputs, real_attribute_mask, device, sample_len,
-                 attribute_num_units=100, attribute_num_layers=3, num_heads=1, attn_dim=200, attn_mask=True,
+                 attribute_num_units=100, attribute_num_layers=3, num_heads=8, attn_dim=512, attn_mask=True,
                  scope_name="DoppelGANgerGenerator",
                  *args, **kwargs):
         super().__init__(noise_dim, attribute_outputs, real_attribute_mask, device, attribute_num_units,
@@ -459,24 +488,10 @@ class DoppelGANgerGeneratorAttention(DoppelGANgerGenerator):
         embed_dim = noise_dim + self.real_attribute_dim + self.addi_attribute_dim
         # add positional encoding
         self.positional_encoding_0 = PositionalEncoding(d_model=embed_dim, max_len=1000)
-        #self.positional_encoding_1 = PositionalEncoding(d_model=attn_dim, max_len=1000)
+        # self.positional_encoding_1 = PositionalEncoding(d_model=attn_dim, max_len=1000)
+        self.decoder = torch.nn.TransformerDecoderLayer(d_model=attn_dim, nhead=num_heads, dim_feedforward=attn_dim,
+                                                        batch_first=True)
         # create multihead self attention
-        # self.feature_multihead_attn_0 = torch.nn.MultiheadAttention(
-        #     embed_dim=embed_dim, num_heads=num_heads, batch_first=True)
-        # self.norm1 = nn.LayerNorm(attn_dim)
-        # self.feature_multihead_attn_1 = torch.nn.MultiheadAttention(
-        #       embed_dim=embed_dim, num_heads=num_heads, batch_first=True)
-        # self.norm2 = nn.LayerNorm(embed_dim)
-        # self.feature_multihead_attn_2 = torch.nn.MultiheadAttention(
-        #     embed_dim=embed_dim, num_heads=num_heads, batch_first=True)
-        # self.norm3 = nn.LayerNorm(attn_dim)
-        # self.linear = nn.Linear(in_features=attn_dim, out_features=attn_dim, bias=True)
-        # self.linear.apply(init_weights)
-        # self.feature_multihead_attn = MultiHeadAttention2(d_model=embed_dim, d_k=50, d_v=50, n_head=1)
-        # self.feature_multihead_attn = MultiheadAttention(embed_dim=embed_dim, num_heads=1, vdim=attn_dim,
-        #                                                  kdim=attn_dim, qdim=attn_dim, device=device)
-        self.feature_multihead_attn_0 = MultiHeadAttention(embed_dim=embed_dim, num_heads=num_heads, attn_dim=attn_dim)
-        self.feature_multihead_attn_1 = MultiHeadAttention(embed_dim=attn_dim, num_heads=num_heads, attn_dim=attn_dim)
         # initialize weights
         self.feature_output_layers = nn.ModuleList()
         feature_counter = 0
@@ -507,30 +522,17 @@ class DoppelGANgerGeneratorAttention(DoppelGANgerGenerator):
     def forward(self, real_attribute_noise, addi_attribute_noise, feature_input_noise):
         all_attribute, feature_gen_input = super().forward(real_attribute_noise, addi_attribute_noise,
                                                            feature_input_noise)
+        feature_gen_input = feature_gen_input.transpose(1, 0)
         feature_gen_input = self.positional_encoding_0(feature_gen_input)
-        # feature_gen_input = self.linear_q_proj(feature_gen_input)
+        feature_gen_input = feature_gen_input.transpose(1, 0)
+
         if self.attn_mask:
             attn_mask = self.generate_square_subsequent_mask(feature_gen_input.shape[1]).to(self.device)
         else:
             attn_mask = None
-        multihead_attn_output, _ = self.feature_multihead_attn_0(feature_gen_input,
-                                                                 attn_mask=attn_mask)
-        #multihead_attn_output = self.positional_encoding_1(multihead_attn_output)
-        multihead_attn_output, _ = self.feature_multihead_attn_1(multihead_attn_output, attn_mask=attn_mask)
-        # multihead_attn_output = feature_gen_input + multihead_attn_output2
-        # multihead_attn_output = self.norm1(multihead_attn_output)
-        # multihead_attn_output, _ = self.feature_multihead_attn_1(multihead_attn_output, multihead_attn_output,
-        #                                                          multihead_attn_output,
-        #                                                          attn_mask=attn_mask)
-        # multihead_attn_output = multihead_attn_output + multihead_attn_output2
-        # multihead_attn_output = self.norm2(multihead_attn_output)
-        # multihead_attn_output, _ = self.feature_multihead_attn_2(multihead_attn_output, multihead_attn_output,
-        #                                                          multihead_attn_output,
-        #                                                          attn_mask=attn_mask)
-        # multihead_attn_output = multihead_attn_output + multihead_attn_output2
-        # multihead_attn_output = self.linear(multihead_attn_output)
-        # multihead_attn_output = multihead_attn_output + multihead_attn_output2
-        # multihead_attn_output = self.norm3(multihead_attn_output)
+        multihead_attn_output = self.decoder(feature_gen_input, feature_gen_input, tgt_mask=attn_mask,
+                                             memory_mask=attn_mask)
+        # check output for correlation
         features = torch.zeros((multihead_attn_output.size(0), multihead_attn_output.size(1), 0)).to(self.device)
         for feature_output_layer in self.feature_output_layers:
             sub_output = feature_output_layer(multihead_attn_output)

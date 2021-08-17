@@ -39,9 +39,9 @@ def autocorrelation(dir, data, data_feature_output):
     :return: pass
     """
     # create folder to save files
-    dir = "{0}/autocorrelation".format(dir)
-    if not os.path.exists(dir):
-        os.makedirs(dir)
+    dir = "{0}_autocorrelation".format(dir)
+    # if not os.path.exists(dir):
+    #     os.makedirs(dir)
     feature_dim = 0
     for f in data_feature_output:
         if f.type_ == output.OutputType.DISCRETE:
@@ -54,7 +54,7 @@ def autocorrelation(dir, data, data_feature_output):
             auto = np.apply_along_axis(func1d=autocorr, axis=1, arr=data_feature)
             data_avg_auto = np.mean(auto, axis=0)
             data_to_plot.append({"auto_data": data_avg_auto, "name": set['name'], "color": set['color']})
-        file = "{0}/feature_{1}".format(dir, feature_dim)
+        file = "{0}_feature_{1}".format(dir, feature_dim)
         plot_auto(data=data_to_plot, file=file)
         feature_dim += f.dim
 
@@ -487,7 +487,7 @@ def mse_autocorrelation(dir, real_data_features, sample_data_features, data_feat
 
 
 # load web dataset for testing
-dataset = 'web'
+dataset = 'FCC_MBA'
 
 # load original data
 (data_feature, data_attribute, data_gen_flag, data_feature_outputs, data_attribute_outputs) = \
@@ -498,48 +498,49 @@ dataset = 'web'
 (data_feature, data_attribute, data_attribute_outputs, real_attribute_mask) = \
         normalize_per_sample(data_feature, data_attribute, data_feature_outputs, data_attribute_outputs)
 """
-# load generated data
-sample_path = 'runs/web/attention_12/checkpoint/epoch_10/generated_samples.npz'
-sampled_data = np.load(sample_path)
+for i in range(0, 400, 10):
+    # load generated data
+    sample_path = 'runs/FCC_MBA/attention_22/checkpoint/epoch_{}/generated_samples.npz'.format(i)
+    sampled_data = np.load(sample_path)
 
-sampled_features = sampled_data['sampled_features']
-sampled_attributes = sampled_data['sampled_attributes']
-sampled_gen_flags = sampled_data['sampled_gen_flags']
-sampled_lengths = sampled_data['sampled_lengths']
+    sampled_features = sampled_data['sampled_features']
+    sampled_attributes = sampled_data['sampled_attributes']
+    sampled_gen_flags = sampled_data['sampled_gen_flags']
+    sampled_lengths = sampled_data['sampled_lengths']
 
-# generate list of dictionaries
-data = []
-# append real data
-data.append({
-    'data_feature': data_feature,
-    'data_attribute': data_attribute,
-    'data_gen_flag': data_gen_flag,
-    'color': 'blue',
-    'name': 'REAL'
-})
-# append sampled data
-data.append({
-    'data_feature': sampled_features,
-    'data_attribute': sampled_attributes,
-    'data_gen_flag': sampled_gen_flags,
-    'data_lengths': sampled_lengths,
-    'color': 'yellow',
-    'name': 'torchDoppelGANger'
-})
+    # generate list of dictionaries
+    data = []
+    # append real data
+    data.append({
+        'data_feature': data_feature,
+        'data_attribute': data_attribute,
+        'data_gen_flag': data_gen_flag,
+        'color': 'yellow',
+        'name': 'REAL'
+    })
+    # append sampled data
+    data.append({
+        'data_feature': sampled_features,
+        'data_attribute': sampled_attributes,
+        'data_gen_flag': sampled_gen_flags,
+        'data_lengths': sampled_lengths,
+        'color': 'blue',
+        'name': 'torchDoppelGANger'
+    })
 
-# create folder to save data
-run_dir = sample_path.split("/")[2]
-epoch_id = sample_path.split("/")[4]
-evaluation_dir = "evaluation/{0}/{1}".format(dataset, run_dir)
-if not os.path.exists(evaluation_dir):
-    os.makedirs(evaluation_dir)
-evaluation_dir = "{0}/{1}".format(evaluation_dir, epoch_id)
-if not os.path.exists(evaluation_dir):
-    os.makedirs(evaluation_dir)
+    # create folder to save data
+    run_dir = sample_path.split("/")[2]
+    epoch_id = sample_path.split("/")[4]
+    evaluation_dir = "evaluation/{0}/{1}".format(dataset, run_dir)
+    if not os.path.exists(evaluation_dir):
+        os.makedirs(evaluation_dir)
+    evaluation_dir = "{0}/{1}".format(evaluation_dir, epoch_id)
+    # if not os.path.exists(evaluation_dir):
+    #     os.makedirs(evaluation_dir)
 
-# call method
+    # call method
 
-autocorrelation(dir=evaluation_dir, data=data, data_feature_output=data_feature_outputs)
+    autocorrelation(dir=evaluation_dir, data=data, data_feature_output=data_feature_outputs)
 
 # sequence_length(dir=evaluation_dir, data=data)
 # cross_measurement(dir=evaluation_dir, data=data, nr_bins=100)
