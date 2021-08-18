@@ -526,9 +526,9 @@ dataset = 'FCC_MBA'
 (data_feature, data_attribute, data_attribute_outputs, real_attribute_mask) = \
         normalize_per_sample(data_feature, data_attribute, data_feature_outputs, data_attribute_outputs)
 """
-for i in range(0, 500, 10):
+for i in range(0, 150, 10):
     # load generated data
-    sample_path = 'runs/FCC_MBA/TRANSFORMER/1/checkpoint/epoch_{}/generated_samples.npz'.format(i)
+    sample_path = 'runs/FCC_MBA/test/1/checkpoint/epoch_{}/generated_samples.npz'.format(i)
     sampled_data = np.load(sample_path)
 
     sampled_features = sampled_data['sampled_features']
@@ -567,13 +567,13 @@ for i in range(0, 500, 10):
     #     os.makedirs(evaluation_dir)
 
     # call methods
-    # autocorrelation(dir=evaluation_dir, data=data, data_feature_output=data_feature_outputs)
+    autocorrelation(dir=evaluation_dir, data=data, data_feature_output=data_feature_outputs)
     # measurement_distribution(dir=evaluation_dir, data=data, feature_output=data_feature_outputs)
     # metadata_distribution(dir=evaluation_dir, data=data, attribute_output=data_attribute_outputs)
     # nearest_neighbors(dir=evaluation_dir, real_data_features=data_feature, sampled_data_features=sampled_features,
     #                   data_feature_outputs=data_feature_outputs)
-    meta_meas_corr(dir=evaluation_dir, data=data, data_attribute_outputs=data_attribute_outputs,
-                   data_feature_outputs=data_feature_outputs)
+    #meta_meas_corr(dir=evaluation_dir, data=data, data_attribute_outputs=data_attribute_outputs,
+                   #data_feature_outputs=data_feature_outputs)
 
 # sequence_length(dir=evaluation_dir, data=data)
 # cross_measurement(dir=evaluation_dir, data=data, nr_bins=100)

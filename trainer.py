@@ -134,6 +134,58 @@ class Trainer:
                 features = features[:, :, :-2]
         return features.cpu().numpy(), attributes.cpu().numpy(), gen_flags, lengths
 
+    def calculate_gp_dis(self, batch_size, fake_feature, data_feature, fake_attribute, data_attribute):
+        alpha_dim2 = torch.FloatTensor(batch_size, 1).uniform_(1).to(self.device)
+        alpha_dim3 = torch.unsqueeze(alpha_dim2, 2).to(self.device)
+        differences_input_feature = (fake_feature -
+                                     data_feature)
+        interpolates_input_feature = (data_feature +
+                                      alpha_dim3 * differences_input_feature)
+        differences_input_attribute = (fake_attribute -
+                                       data_attribute)
+        interpolates_input_attribute = (data_attribute +
+                                        (alpha_dim2 *
+                                         differences_input_attribute))
+        mixed_scores = self.dis(interpolates_input_feature,
+                                interpolates_input_attribute)
+        gradients = torch.autograd.grad(
+            inputs=[interpolates_input_feature, interpolates_input_attribute],
+            outputs=mixed_scores,
+            grad_outputs=torch.ones_like(mixed_scores),
+            create_graph=True,
+            retain_graph=True
+        )
+        slopes1 = torch.sum(torch.square(gradients[0]),
+                            dim=(1, 2))
+        slopes2 = torch.sum(torch.square(gradients[1]),
+                            dim=(1))
+        slopes = torch.sqrt(slopes1 + slopes2 + self.EPS)
+        loss_dis_gp = torch.mean((slopes - 1.) ** 2)
+        loss_dis_gp_unflattened = (slopes - 1.) ** 2
+        return loss_dis_gp, loss_dis_gp_unflattened
+
+    def calculate_gp_attr_dis(self, batch_size, fake_attribute, data_attribute):
+        alpha_dim2 = torch.FloatTensor(batch_size, 1).uniform_(1).to(self.device)
+        differences_input_attribute = (fake_attribute -
+                                       data_attribute)
+        interpolates_input_attribute = (data_attribute +
+                                        (alpha_dim2 *
+                                         differences_input_attribute))
+        mixed_scores = self.attr_dis(interpolates_input_attribute)
+        gradients = torch.autograd.grad(
+            inputs=interpolates_input_attribute,
+            outputs=mixed_scores,
+            grad_outputs=torch.ones_like(mixed_scores),
+            create_graph=True,
+            retain_graph=True
+        )
+        slopes1 = torch.sum(torch.square(gradients[0]),
+                            dim=(1))
+        slopes = torch.sqrt(slopes1 + self.EPS)
+        loss_attr_dis_gp = torch.mean((slopes - 1.) ** 2)
+        loss_attr_dis_gp_unflattened = (slopes - 1.) ** 2
+        return loss_attr_dis_gp, loss_attr_dis_gp_unflattened
+
     def add_losses(self, running_losses, writer_frequency, epoch, n_total_steps, batch_idx):
         self.writer.add_scalar('loss/d_wo_gp', running_losses["dis_wogp_rl"] / writer_frequency,
                                epoch * n_total_steps + batch_idx)
@@ -234,33 +286,8 @@ class Trainer:
                     # TODO:    ALL THIS UNFLATTEN STUFF IS ONLY FOR SPECIAL LOSSES (SEE DOPPELGANGER BUILD LOSS)
                     dis_fake_unflattened = dis_fake
                     dis_real_unflattened = -dis_real
-                    alpha_dim2 = torch.FloatTensor(batch_size, 1).uniform_(1).to(self.device)
-                    alpha_dim3 = torch.unsqueeze(alpha_dim2, 2).to(self.device)
-                    differences_input_feature = (fake_feature -
-                                                 data_feature)
-                    interpolates_input_feature = (data_feature +
-                                                  alpha_dim3 * differences_input_feature)
-                    differences_input_attribute = (fake_attribute -
-                                                   data_attribute)
-                    interpolates_input_attribute = (data_attribute +
-                                                    (alpha_dim2 *
-                                                     differences_input_attribute))
-                    mixed_scores = self.dis(interpolates_input_feature,
-                                            interpolates_input_attribute)
-                    gradients = torch.autograd.grad(
-                        inputs=[interpolates_input_feature, interpolates_input_attribute],
-                        outputs=mixed_scores,
-                        grad_outputs=torch.ones_like(mixed_scores),
-                        create_graph=True,
-                        retain_graph=True
-                    )
-                    slopes1 = torch.sum(torch.square(gradients[0]),
-                                        dim=(1, 2))
-                    slopes2 = torch.sum(torch.square(gradients[1]),
-                                        dim=(1))
-                    slopes = torch.sqrt(slopes1 + slopes2 + self.EPS)
-                    loss_dis_gp = torch.mean((slopes - 1.) ** 2)
-                    loss_dis_gp_unflattened = (slopes - 1.) ** 2
+                    loss_dis_gp, loss_dis_gp_unflattened = self.calculate_gp_dis(batch_size, fake_feature, data_feature,
+                                                                                 fake_attribute, data_attribute)
                     loss_dis = loss_dis_fake + loss_dis_real + self.dis_lambda_gp * loss_dis_gp
                     d_loss_unflattened = (dis_fake_unflattened +
                                           dis_real_unflattened +
@@ -282,26 +309,9 @@ class Trainer:
                     # calculate gradient penalty
                     attr_dis_real_unflattened = -attr_dis_real
                     attr_dis_fake_unflattened = attr_dis_fake
-                    alpha_dim2 = torch.FloatTensor(batch_size, 1).uniform_(1).to(self.device)
-                    differences_input_attribute = (fake_attribute -
-                                                   data_attribute)
-                    interpolates_input_attribute = (data_attribute +
-                                                    (alpha_dim2 *
-                                                     differences_input_attribute))
-                    mixed_scores = self.attr_dis(interpolates_input_attribute)
-                    gradients = torch.autograd.grad(
-                        inputs=interpolates_input_attribute,
-                        outputs=mixed_scores,
-                        grad_outputs=torch.ones_like(mixed_scores),
-                        create_graph=True,
-                        retain_graph=True
-                    )
-                    slopes1 = torch.sum(torch.square(gradients[0]),
-                                        dim=(1))
-                    slopes = torch.sqrt(slopes1 + self.EPS)
-                    loss_attr_dis_gp = torch.mean((slopes - 1.) ** 2)
-                    loss_attr_dis_gp_unflattened = (slopes - 1.) ** 2
-
+                    loss_attr_dis_gp, loss_attr_dis_gp_unflattened = self.calculate_gp_attr_dis(batch_size,
+                                                                                                fake_attribute,
+                                                                                                data_attribute)
                     loss_attr_dis = loss_attr_dis_fake + loss_attr_dis_real + self.attr_dis_lambda_gp * loss_attr_dis_gp
                     loss_attr_dis_unflattened = (attr_dis_fake_unflattened +
                                                  attr_dis_real_unflattened +
