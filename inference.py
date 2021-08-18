@@ -13,7 +13,7 @@ sample_len = 10
 batch_size = 100
 noise_dim = 5
 # load data
-dataset = 'web'
+dataset = 'FCC_MBA'
 
 (data_feature, data_attribute,
  data_gen_flag,
@@ -53,6 +53,7 @@ attr_d_gp_coe = 10.0
 g_attr_d_coe = 1.0
 extra_checkpoint_freq = 5
 num_packing = 1
+
 
 model_dir = "runs/web/1/checkpoint/epoch_380"
 trainer = Trainer(discriminator=discriminator, attr_discriminator=attr_discriminator, generator=generator,

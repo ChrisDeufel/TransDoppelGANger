@@ -39,9 +39,12 @@ def autocorrelation(dir, data, data_feature_output):
     :return: pass
     """
     # create folder to save files
-    dir = "{0}_autocorrelation".format(dir)
-    # if not os.path.exists(dir):
-    #     os.makedirs(dir)
+    eval_dir = dir.rsplit("/", 1)[0]
+    epoch = dir.rsplit("/", 1)[1]
+    dir = "{0}/{1}".format(eval_dir, "autocorrelation")
+    if not os.path.exists(dir):
+        os.makedirs(dir)
+    #dir = "{0}/{1}".format(dir, epoch)
     feature_dim = 0
     for f in data_feature_output:
         if f.type_ == output.OutputType.DISCRETE:
@@ -54,7 +57,10 @@ def autocorrelation(dir, data, data_feature_output):
             auto = np.apply_along_axis(func1d=autocorr, axis=1, arr=data_feature)
             data_avg_auto = np.mean(auto, axis=0)
             data_to_plot.append({"auto_data": data_avg_auto, "name": set['name'], "color": set['color']})
-        file = "{0}_feature_{1}".format(dir, feature_dim)
+        file = "{0}/feature_{1}".format(dir, feature_dim)
+        if not os.path.exists(file):
+            os.makedirs(file)
+        file = "{0}/{1}".format(file, epoch)
         plot_auto(data=data_to_plot, file=file)
         feature_dim += f.dim
 
@@ -180,9 +186,12 @@ def plot_distribution(data, file, title, normalization=None):
 
 def measurement_distribution(dir, data, feature_output, nr_bins=100):
     # create folder to save files
-    dir = "{0}/measurement_distribution".format(dir)
+    eval_dir = dir.rsplit("/", 1)[0]
+    epoch = dir.rsplit("/", 1)[1]
+    dir = "{0}/{1}".format(eval_dir, "measurement_distribution")
     if not os.path.exists(dir):
         os.makedirs(dir)
+    #dir = "{0}/{1}".format(dir, epoch)
     dim = 0
     counter = 0
     for f in feature_output:
@@ -210,6 +219,9 @@ def measurement_distribution(dir, data, feature_output, nr_bins=100):
             data_to_plot.append({'bins': bins, 'name': set['name'], 'color': set['color']})
         dim += f.dim
         file = "{0}/feature_{1}".format(dir, counter)
+        if not os.path.exists(file):
+            os.makedirs(file)
+        file = "{0}/{1}".format(file, epoch)
         plot_distribution(data=data_to_plot, file=file,
                           title="measurement_distribution", normalization=f.normalization)
         counter += 1
@@ -223,9 +235,12 @@ def metadata_distribution(dir, data, attribute_output):
     :return: pass
     """
     # create folder to save files
-    dir = "{0}/metadata_distribution".format(dir)
+    eval_dir = dir.rsplit("/", 1)[0]
+    epoch = dir.rsplit("/", 1)[1]
+    dir = "{0}/{1}".format(eval_dir, "metadata_distribution")
     if not os.path.exists(dir):
         os.makedirs(dir)
+    #dir = "{0}/{1}".format(dir, epoch)
     dim = 0
     counter = 0
     for i in attribute_output:
@@ -240,8 +255,10 @@ def metadata_distribution(dir, data, attribute_output):
             data_attribute = one_hot
             bins = np.sum(data_attribute, axis=0)
             data_to_plot.append({'bins': bins, 'name': set['name'], 'color': set['color']})
-
         file = "{0}/attribute_{1}".format(dir, counter)
+        if not os.path.exists(file):
+            os.makedirs(file)
+        file = "{0}/{1}".format(file, epoch)
         plot_distribution(data=data_to_plot, file=file,
                           title="metadata_distribution")
         dim += i.dim
@@ -264,7 +281,9 @@ def meta_meas_corr(dir, data, data_attribute_outputs, data_feature_outputs, plot
     :return: pass
     """
     # create folder to save files
-    dir = "{0}/meta_meas_correlation".format(dir)
+    eval_dir = dir.rsplit("/", 1)[0]
+    epoch = dir.rsplit("/", 1)[1]
+    dir = "{0}/{1}".format(eval_dir, "meta_meas_correlation")
     if not os.path.exists(dir):
         os.makedirs(dir)
     d = []
@@ -328,6 +347,9 @@ def meta_meas_corr(dir, data, data_attribute_outputs, data_feature_outputs, plot
                                     {'pdf': pdf_fake, 'name': data[1]['name'], 'color': data[1]['color']}]
                     if plot:
                         file = '{0}/attribute{1}_dim{2}_feature{3}'.format(dir, a, i, feature_dim)
+                        if not os.path.exists(file):
+                            os.makedirs(file)
+                        file = "{0}/{1}".format(file, epoch)
                         plot_cdf(data=data_to_plot,
                                  file=file)
                     d.append(wasserstein_distance(pdf_real, pdf_fake) - 1)
@@ -424,9 +446,12 @@ def plot_nearest_neighbors(data, file, real_data_features, sampled_data_features
 
 def nearest_neighbors(dir, real_data_features, sampled_data_features, data_feature_outputs):
     # create folder to save files
-    dir = "{0}/nearest_neighbor".format(dir)
+    eval_dir = dir.rsplit("/", 1)[0]
+    epoch = dir.rsplit("/", 1)[1]
+    dir = "{0}/{1}".format(eval_dir, "nearest_neighbor")
     if not os.path.exists(dir):
         os.makedirs(dir)
+    #dir = "{0}/{1}".format(dir, epoch)
     feature_dim = 0
     for f in range(len(data_feature_outputs)):
         if data_feature_outputs[f].type_ == output.OutputType.DISCRETE:
@@ -435,7 +460,7 @@ def nearest_neighbors(dir, real_data_features, sampled_data_features, data_featu
         data_to_plot = []
         for i in range(3):
             # select random sample
-            sample_nr = random.randint(0, sampled_data_features.shape[0])
+            sample_nr = random.randint(0, sampled_data_features.shape[0]-1)
             sample_feature = sampled_data_features[sample_nr, :, feature_dim]
             # calculate distance to all real samples
             dist = np.zeros(real_data_features.shape[0])
@@ -447,7 +472,10 @@ def nearest_neighbors(dir, real_data_features, sampled_data_features, data_featu
             # get indices with lowest mse
             dist_ind = np.argsort(dist)
             data_to_plot.append({"sample_index": sample_nr, "nn_indices": dist_ind})
-        file = "{0}/feature{1}".format(dir, f)
+        file = "{0}/feature_{1}".format(dir, f)
+        if not os.path.exists(file):
+            os.makedirs(file)
+        file = "{0}/{1}".format(file, epoch)
         plot_nearest_neighbors(data=data_to_plot, file=file,
                                real_data_features=real_data_features, sampled_data_features=sampled_data_features,
                                feature_dim=f)
@@ -498,9 +526,9 @@ dataset = 'FCC_MBA'
 (data_feature, data_attribute, data_attribute_outputs, real_attribute_mask) = \
         normalize_per_sample(data_feature, data_attribute, data_feature_outputs, data_attribute_outputs)
 """
-for i in range(0, 400, 10):
+for i in range(0, 500, 10):
     # load generated data
-    sample_path = 'runs/FCC_MBA/attention_22/checkpoint/epoch_{}/generated_samples.npz'.format(i)
+    sample_path = 'runs/FCC_MBA/TRANSFORMER/1/checkpoint/epoch_{}/generated_samples.npz'.format(i)
     sampled_data = np.load(sample_path)
 
     sampled_features = sampled_data['sampled_features']
@@ -529,8 +557,8 @@ for i in range(0, 400, 10):
     })
 
     # create folder to save data
-    run_dir = sample_path.split("/")[2]
-    epoch_id = sample_path.split("/")[4]
+    run_dir = "{}/{}".format(sample_path.split("/")[2], sample_path.split("/")[3])
+    epoch_id = sample_path.split("/")[5]
     evaluation_dir = "evaluation/{0}/{1}".format(dataset, run_dir)
     if not os.path.exists(evaluation_dir):
         os.makedirs(evaluation_dir)
@@ -538,17 +566,18 @@ for i in range(0, 400, 10):
     # if not os.path.exists(evaluation_dir):
     #     os.makedirs(evaluation_dir)
 
-    # call method
-
-    autocorrelation(dir=evaluation_dir, data=data, data_feature_output=data_feature_outputs)
+    # call methods
+    # autocorrelation(dir=evaluation_dir, data=data, data_feature_output=data_feature_outputs)
+    # measurement_distribution(dir=evaluation_dir, data=data, feature_output=data_feature_outputs)
+    # metadata_distribution(dir=evaluation_dir, data=data, attribute_output=data_attribute_outputs)
+    # nearest_neighbors(dir=evaluation_dir, real_data_features=data_feature, sampled_data_features=sampled_features,
+    #                   data_feature_outputs=data_feature_outputs)
+    meta_meas_corr(dir=evaluation_dir, data=data, data_attribute_outputs=data_attribute_outputs,
+                   data_feature_outputs=data_feature_outputs)
 
 # sequence_length(dir=evaluation_dir, data=data)
 # cross_measurement(dir=evaluation_dir, data=data, nr_bins=100)
-#measurement_distribution(dir=evaluation_dir, data=data, feature_output=data_feature_outputs)
-#metadata_distribution(dir=evaluation_dir, data=data, attribute_output=data_attribute_outputs)
-# meta_meas_corr(dir=evaluation_dir, data=data, data_attribute_outputs=data_attribute_outputs,
-#                data_feature_outputs=data_feature_outputs)
-# nearest_neighbors(dir=evaluation_dir, real_data_features=data_feature, sampled_data_features=sampled_features,
-#                  data_feature_outputs=data_feature_outputs)
+
+
 # mse_autocorrelation(dir=evaluation_dir, real_data_features=data_feature, sample_data_features=sampled_features,
 #                    data_feature_outputs=data_feature_outputs)
