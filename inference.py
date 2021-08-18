@@ -2,7 +2,7 @@ from torch.utils.data import DataLoader
 import torch
 import numpy as np
 from trainer import Trainer
-from gan.network_2 import Discriminator, AttrDiscriminator, DoppelGANgerGeneratorRNN, DoppelGANgerGeneratorAttention
+from gan.network import Discriminator, AttrDiscriminator, DoppelGANgerGeneratorRNN, DoppelGANgerGeneratorAttention
 #from gan.network import Discriminator, AttrDiscriminator, DoppelGANgerGenerator
 from load_data import load_data
 from util import normalize_per_sample, add_gen_flag

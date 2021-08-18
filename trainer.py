@@ -134,12 +134,51 @@ class Trainer:
                 features = features[:, :, :-2]
         return features.cpu().numpy(), attributes.cpu().numpy(), gen_flags, lengths
 
+    def add_losses(self, running_losses, writer_frequency, epoch, n_total_steps, batch_idx):
+        self.writer.add_scalar('loss/d_wo_gp', running_losses["dis_wogp_rl"] / writer_frequency,
+                               epoch * n_total_steps + batch_idx)
+        self.writer.add_scalar('loss/d_total', running_losses["dis_total_rl"] / writer_frequency,
+                               epoch * n_total_steps + batch_idx)
+        self.writer.add_scalar('loss/d/fake', running_losses["dis_fake_rl"] / writer_frequency,
+                               epoch * n_total_steps + batch_idx)
+        self.writer.add_scalar('loss/d/real', running_losses["dis_real_rl"] / writer_frequency,
+                               epoch * n_total_steps + batch_idx)
+        self.writer.add_scalar('loss/d/gp', running_losses["dis_gp_rl"] / writer_frequency,
+                               epoch * n_total_steps + batch_idx)
+        self.writer.add_scalar('loss/attr_d', running_losses["attr_dis_rl"] / writer_frequency,
+                               epoch * n_total_steps + batch_idx)
+        self.writer.add_scalar('loss/attr_d/fake', running_losses["attr_dis_fake_rl"] / writer_frequency,
+                               epoch * n_total_steps + batch_idx)
+        self.writer.add_scalar('loss/attr_d/real', running_losses["attr_dis_real_rl"] / writer_frequency,
+                               epoch * n_total_steps + batch_idx)
+        self.writer.add_scalar('loss/attr_d/gp', running_losses["attr_dis_gp_rl"] / writer_frequency,
+                               epoch * n_total_steps + batch_idx)
+        self.writer.add_scalar('loss/g/d', running_losses["gen_d_rl"] / writer_frequency,
+                               epoch * n_total_steps + batch_idx)
+        self.writer.add_scalar('loss/g/attr_d', running_losses["gen_attr_d_rl"] / writer_frequency,
+                               epoch * n_total_steps + batch_idx)
+        self.writer.add_scalar('loss/g', running_losses["gen_rl"] / writer_frequency,
+                               epoch * n_total_steps + batch_idx)
+        running_losses["dis_total_rl"] = 0
+        running_losses["dis_wogp_rl"] = 0
+        running_losses["dis_fake_rl"] = 0
+        running_losses["dis_real_rl"] = 0
+        running_losses["dis_gp_rl"] = 0
+        running_losses["attr_dis_rl"] = 0
+        running_losses["attr_dis_fake_rl"] = 0
+        running_losses["attr_dis_real_rl"] = 0
+        running_losses["attr_dis_gp_rl"] = 0
+        running_losses["gen_d_rl"] = 0
+        running_losses["gen_rl"] = 0
+        running_losses["gen_attr_d_rl"] = 0
+        return running_losses
+
     def train(self, epochs, writer_frequency=1, saver_frequency=10):
         self.dis.train()
         self.attr_dis.train()
         self.gen.train()
-        # add models to writer
 
+        # add models to writer
         self.writer.add_graph(model=self.dis, input_to_model=[
             torch.randn([1, self.dis.input_feature_shape[1], self.dis.input_feature_shape[2]]).to(self.device),
             torch.randn([1, self.dis.input_attribute_shape[1]]).to(self.device)])
@@ -149,19 +188,22 @@ class Trainer:
                                               torch.randn(1, self.noise_dim).to(self.device),
                                               torch.randn(1, self.sample_time, self.noise_dim).to(self.device)])
 
-        # create all running losses (rl)
-        dis_total_rl = 0
-        dis_wogp_rl = 0
-        dis_fake_rl = 0
-        dis_real_rl = 0
-        dis_gp_rl = 0
-        attr_dis_rl = 0
-        attr_dis_fake_rl = 0
-        attr_dis_real_rl = 0
-        attr_dis_gp_rl = 0
-        gen_rl = 0
-        gen_d_rl = 0
-        gen_attr_d_rl = 0
+        # create all running losses (rl) dict
+        running_losses = {
+            "dis_total_rl": 0,
+            "dis_wogp_rl": 0,
+            "dis_fake_rl": 0,
+            "dis_real_rl": 0,
+            "dis_gp_rl": 0,
+            "attr_dis_rl": 0,
+            "attr_dis_fake_rl": 0,
+            "attr_dis_real_rl": 0,
+            "attr_dis_gp_rl": 0,
+            "gen_rl": 0,
+            "gen_d_rl": 0,
+            "gen_attr_d_rl": 0
+        }
+
         n_total_steps = len(self.real_train_dl)
         for epoch in range(epochs):
             self.dis.train()
@@ -186,7 +228,7 @@ class Trainer:
 
                     loss_dis_fake = torch.mean(dis_fake)
                     loss_dis_real = -torch.mean(dis_real)
-                    dis_wogp_rl += (loss_dis_fake + loss_dis_real).item()
+                    running_losses["dis_wogp_rl"] += (loss_dis_fake + loss_dis_real).item()
 
                     # calculate gradient penalty
                     # TODO:    ALL THIS UNFLATTEN STUFF IS ONLY FOR SPECIAL LOSSES (SEE DOPPELGANGER BUILD LOSS)
@@ -227,10 +269,10 @@ class Trainer:
                     loss_dis.backward(retain_graph=True)
                     self.dis_opt.step()
 
-                    dis_total_rl += loss_dis.item()
-                    dis_fake_rl += loss_dis_fake.item()
-                    dis_real_rl += loss_dis_real.item()
-                    dis_gp_rl += loss_dis_gp.item()
+                    running_losses["dis_total_rl"] += loss_dis.item()
+                    running_losses["dis_fake_rl"] += loss_dis_fake.item()
+                    running_losses["dis_real_rl"] += loss_dis_real.item()
+                    running_losses["dis_gp_rl"] += loss_dis_gp.item()
 
                     # attribute discriminator
                     attr_dis_real = self.attr_dis(data_attribute)
@@ -268,10 +310,11 @@ class Trainer:
                     self.attr_dis.zero_grad()
                     loss_attr_dis.backward(retain_graph=True)
                     self.attr_dis_opt.step()
-                    attr_dis_rl += loss_attr_dis.item()
-                    attr_dis_fake_rl += loss_attr_dis_fake.item()
-                    attr_dis_real_rl += loss_attr_dis_real.item()
-                    attr_dis_gp_rl += loss_attr_dis_gp.item()
+
+                    running_losses["attr_dis_rl"] += loss_attr_dis.item()
+                    running_losses["attr_dis_fake_rl"] += loss_attr_dis_fake.item()
+                    running_losses["attr_dis_real_rl"] += loss_attr_dis_real.item()
+                    running_losses["attr_dis_gp_rl"] += loss_attr_dis_gp.item()
 
                 # Train Generator: max E[critic(gen_fake)] <-> min -E[critic(gen_fake)]
                 for _ in range(self.g_rounds):
@@ -280,90 +323,19 @@ class Trainer:
                     loss_gen_d = -torch.mean(gen_d_fake)
                     loss_gen_attr_d = -torch.mean(gen_attr_d_fake)
                     loss_gen = loss_gen_d + self.g_attr_d_coe * loss_gen_attr_d
-                    # torch.autograd.set_detect_anomaly(True)
                     self.gen.zero_grad()
                     loss_gen.backward()
                     self.gen_opt.step()
 
-                    gen_d_rl += loss_gen_d.item()
-                    gen_attr_d_rl += loss_gen_attr_d.item()
-                    gen_rl += loss_gen.item()
+                    running_losses["gen_d_rl"] += loss_gen_d.item()
+                    running_losses["gen_attr_d_rl"] += loss_gen_attr_d.item()
+                    running_losses["gen_rl"] += loss_gen.item()
 
-                    #write losses to summary writer
+                    # write losses to summary writer
                     if (batch_idx + 1) % writer_frequency == 0:
-                        self.writer.add_scalar('loss/d_wo_gp', dis_wogp_rl / writer_frequency,
-                                               epoch * n_total_steps + batch_idx)
-                        self.writer.add_scalar('loss/d_total', dis_total_rl / writer_frequency,
-                                               epoch * n_total_steps + batch_idx)
-                        self.writer.add_scalar('loss/d/fake', dis_fake_rl / writer_frequency,
-                                               epoch * n_total_steps + batch_idx)
-                        self.writer.add_scalar('loss/d/real', dis_real_rl / writer_frequency,
-                                               epoch * n_total_steps + batch_idx)
-                        self.writer.add_scalar('loss/d/gp', dis_gp_rl / writer_frequency,
-                                               epoch * n_total_steps + batch_idx)
-                        self.writer.add_scalar('loss/attr_d', attr_dis_rl / writer_frequency,
-                                               epoch * n_total_steps + batch_idx)
-                        self.writer.add_scalar('loss/attr_d/fake', attr_dis_fake_rl / writer_frequency,
-                                               epoch * n_total_steps + batch_idx)
-                        self.writer.add_scalar('loss/attr_d/real', attr_dis_real_rl / writer_frequency,
-                                               epoch * n_total_steps + batch_idx)
-                        self.writer.add_scalar('loss/attr_d/gp', attr_dis_gp_rl / writer_frequency,
-                                               epoch * n_total_steps + batch_idx)
-                        self.writer.add_scalar('loss/g/d', gen_d_rl / writer_frequency,
-                                               epoch * n_total_steps + batch_idx)
-                        self.writer.add_scalar('loss/g/attr_d', gen_attr_d_rl / writer_frequency,
-                                               epoch * n_total_steps + batch_idx)
-                        self.writer.add_scalar('loss/g', gen_rl / writer_frequency,
-                                               epoch * n_total_steps + batch_idx)
-                        dis_total_rl = 0
-                        dis_wogp_rl = 0
-                        dis_fake_rl = 0
-                        dis_real_rl = 0
-                        dis_gp_rl = 0
-                        attr_dis_rl = 0
-                        attr_dis_fake_rl = 0
-                        attr_dis_real_rl = 0
-                        attr_dis_gp_rl = 0
-                        gen_d_rl = 0
-                        gen_rl = 0
-                        gen_attr_d_rl = 0
+                        running_losses = self.add_losses(running_losses, writer_frequency, epoch, n_total_steps,
+                                                         batch_idx)
 
-            # self.writer.add_scalar('loss/d_wo_gp', dis_wogp_rl / writer_frequency,
-            #                        epoch)
-            # self.writer.add_scalar('loss/d_total', dis_total_rl / writer_frequency,
-            #                        epoch)
-            # self.writer.add_scalar('loss/d/fake', dis_fake_rl / writer_frequency,
-            #                        epoch)
-            # self.writer.add_scalar('loss/d/real', dis_real_rl / writer_frequency,
-            #                        epoch)
-            # self.writer.add_scalar('loss/d/gp', dis_gp_rl / writer_frequency,
-            #                        epoch)
-            # self.writer.add_scalar('loss/attr_d', attr_dis_rl / writer_frequency,
-            #                        epoch)
-            # self.writer.add_scalar('loss/attr_d/fake', attr_dis_fake_rl / writer_frequency,
-            #                        epoch)
-            # self.writer.add_scalar('loss/attr_d/real', attr_dis_real_rl / writer_frequency,
-            #                        epoch)
-            # self.writer.add_scalar('loss/attr_d/gp', attr_dis_gp_rl / writer_frequency,
-            #                        epoch)
-            # self.writer.add_scalar('loss/g/d', gen_d_rl / writer_frequency,
-            #                        epoch)
-            # self.writer.add_scalar('loss/g/attr_d', gen_attr_d_rl / writer_frequency,
-            #                        epoch)
-            # self.writer.add_scalar('loss/g', gen_rl / writer_frequency,
-            #                        epoch)
-            # dis_total_rl = 0
-            # dis_wogp_rl = 0
-            # dis_fake_rl = 0
-            # dis_real_rl = 0
-            # dis_gp_rl = 0
-            # attr_dis_rl = 0
-            # attr_dis_fake_rl = 0
-            # attr_dis_real_rl = 0
-            # attr_dis_gp_rl = 0
-            # gen_d_rl = 0
-            # gen_rl = 0
-            # gen_attr_d_rl = 0
             time_logger.info('END OF EPOCH {0}'.format(epoch))
             # save model
             if epoch % saver_frequency == 0:

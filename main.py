@@ -5,18 +5,18 @@ from load_data import load_data
 from data import Data, LargeData
 from trainer import Trainer, add_handler_trainer
 # from gan.network import Discriminator, AttrDiscriminator, DoppelGANgerGenerator
-from gan.network_2 import Discriminator, AttrDiscriminator, DoppelGANgerGeneratorAttention, DoppelGANgerGeneratorRNN
+from gan.network import Discriminator, AttrDiscriminator, DoppelGANgerGeneratorAttention, DoppelGANgerGeneratorRNN
 from util import add_gen_flag, normalize_per_sample
 import os
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
 # device = 'cpu'
 dataset = "FCC_MBA"
-checkpoint_dir = 'runs/{0}/RNN/2/checkpoint'.format(dataset)
+checkpoint_dir = 'runs/{0}/test/1/checkpoint'.format(dataset)
 if not os.path.exists(checkpoint_dir):
     os.makedirs(checkpoint_dir)
-time_logging_file = 'runs/{0}/RNN/2/time.log'.format(dataset)
-config_logging_file = 'runs/{0}/RNN/2/config.log'.format(dataset)
+time_logging_file = 'runs/{0}/test/1/time.log'.format(dataset)
+config_logging_file = 'runs/{0}/test/1/config.log'.format(dataset)
 # SET UP LOGGING
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
