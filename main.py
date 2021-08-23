@@ -4,19 +4,18 @@ import logging
 from load_data import load_data
 from data import Data, LargeData
 from trainer import Trainer, add_handler_trainer
-# from gan.network import Discriminator, AttrDiscriminator, DoppelGANgerGenerator
 from gan.network import Discriminator, AttrDiscriminator, DoppelGANgerGeneratorAttention, DoppelGANgerGeneratorRNN
 from util import add_gen_flag, normalize_per_sample
 import os
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
 # device = 'cpu'
-dataset = "FCC_MBA"
-checkpoint_dir = 'runs/{0}/test/1/checkpoint'.format(dataset)
+dataset = "google_small"
+checkpoint_dir = 'runs/{0}/RNN/1/checkpoint'.format(dataset)
 if not os.path.exists(checkpoint_dir):
     os.makedirs(checkpoint_dir)
-time_logging_file = 'runs/{0}/test/1/time.log'.format(dataset)
-config_logging_file = 'runs/{0}/test/1/config.log'.format(dataset)
+time_logging_file = 'runs/{0}/RNN/1/time.log'.format(dataset)
+config_logging_file = 'runs/{0}/RNN/1/config.log'.format(dataset)
 # SET UP LOGGING
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
@@ -36,7 +35,7 @@ config_handler.setLevel(logging.INFO)
 config_handler.setFormatter(config_formatter)
 logger.addHandler(config_handler)
 
-sample_len = 8
+sample_len = 50
 batch_size = 100
 attn_dim = 100
 # load data
@@ -65,7 +64,7 @@ logger.info("ATTRIBUTE DISCRIMINATOR: {0}".format(attr_discriminator))
 generator = DoppelGANgerGeneratorRNN(noise_dim=noise_dim, feature_outputs=dataset.data_feature_outputs,
                                      attribute_outputs=dataset.data_attribute_outputs,
                                      real_attribute_mask=dataset.real_attribute_mask, device=device,
-                                     sample_len=sample_len, num_heads=num_heads, attn_dim=attn_dim)
+                                     sample_len=sample_len)
 
 logger.info("GENERATOR: {0}".format(generator))
 # define optimizer
@@ -102,4 +101,4 @@ trainer = Trainer(discriminator=discriminator, attr_discriminator=attr_discrimin
                   real_train_dl=real_train_dl, data_feature_shape=data_feature_shape, device=device,
                   checkpoint_dir=checkpoint_dir, noise_dim=noise_dim,
                   logging_file=time_logging_file, sample_len=sample_len, d_rounds=d_rounds, g_rounds=g_rounds)
-trainer.train(epochs=epoch, writer_frequency=1, saver_frequency=10)
+trainer.train(epochs=epoch, writer_frequency=1, saver_frequency=20)

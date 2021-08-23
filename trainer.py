@@ -231,14 +231,14 @@ class Trainer:
         self.gen.train()
 
         # add models to writer
-        self.writer.add_graph(model=self.dis, input_to_model=[
-            torch.randn([1, self.dis.input_feature_shape[1], self.dis.input_feature_shape[2]]).to(self.device),
-            torch.randn([1, self.dis.input_attribute_shape[1]]).to(self.device)])
-        self.writer.add_graph(self.attr_dis, input_to_model=torch.randn([1, self.attr_dis.input_size]).to(self.device))
-        self.writer.add_graph(self.gen,
-                              input_to_model=[torch.randn(1, self.noise_dim).to(self.device),
-                                              torch.randn(1, self.noise_dim).to(self.device),
-                                              torch.randn(1, self.sample_time, self.noise_dim).to(self.device)])
+        # self.writer.add_graph(model=self.dis, input_to_model=[
+        #     torch.randn([1, self.dis.input_feature_shape[1], self.dis.input_feature_shape[2]]).to(self.device),
+        #     torch.randn([1, self.dis.input_attribute_shape[1]]).to(self.device)])
+        # self.writer.add_graph(self.attr_dis, input_to_model=torch.randn([1, self.attr_dis.input_size]).to(self.device))
+        # self.writer.add_graph(self.gen,
+        #                       input_to_model=[torch.randn(1, self.noise_dim).to(self.device),
+        #                                       torch.randn(1, self.noise_dim).to(self.device),
+        #                                       torch.randn(1, self.sample_time, self.noise_dim).to(self.device)])
 
         # create all running losses (rl) dict
         running_losses = {
@@ -340,7 +340,6 @@ class Trainer:
                     running_losses["gen_d_rl"] += loss_gen_d.item()
                     running_losses["gen_attr_d_rl"] += loss_gen_attr_d.item()
                     running_losses["gen_rl"] += loss_gen.item()
-
                     # write losses to summary writer
                     if (batch_idx + 1) % writer_frequency == 0:
                         running_losses = self.add_losses(running_losses, writer_frequency, epoch, n_total_steps,
@@ -350,5 +349,5 @@ class Trainer:
             # save model
             if epoch % saver_frequency == 0:
                 self.save(epoch)
-                self.inference(data_attribute, epoch)
+                #self.inference(data_attribute, epoch)
         self.writer.close()

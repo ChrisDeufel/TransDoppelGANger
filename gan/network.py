@@ -125,8 +125,7 @@ class DoppelGANgerGenerator(nn.Module):
         for attr_layer in self.real_attr_output_layers:
             sub_output = attr_layer(real_attribute_gen_output)
             if isinstance(attr_layer[-1], nn.Softmax):
-                sub_output = F.one_hot(torch.argmax(sub_output, dim=1), num_classes=sub_output.shape[1])
-                sub_output_discrete = sub_output
+                sub_output_discrete = F.one_hot(torch.argmax(sub_output, dim=1), num_classes=sub_output.shape[1])
             else:
                 sub_output_discrete = sub_output
             part_attribute.append(sub_output)
@@ -161,8 +160,8 @@ class DoppelGANgerGenerator(nn.Module):
         all_discrete_attribute = torch.cat(all_discrete_attribute, dim=1)
 
         # create feature generator input
-        all_discrete_attribute = torch.unsqueeze(all_discrete_attribute, dim=1)
-        attribute_output = all_discrete_attribute
+        attribute_output = torch.unsqueeze(all_discrete_attribute, dim=1)
+        # attribute_output = all_discrete_attribute
         attribute_feature_input = torch.cat(feature_input_noise.shape[1] * [attribute_output], dim=1)
         attribute_feature_input = attribute_feature_input.detach()
         feature_gen_input = torch.cat((attribute_feature_input, feature_input_noise), dim=2)
