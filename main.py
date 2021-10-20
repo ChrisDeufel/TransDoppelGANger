@@ -10,12 +10,12 @@ import os
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
 # device = 'cpu'
-dataset = "google_small"
-checkpoint_dir = 'runs/{0}/RNN/1/checkpoint'.format(dataset)
+dataset = "FCC_MBA"
+checkpoint_dir = 'runs/{0}/test/1/checkpoint'.format(dataset)
 if not os.path.exists(checkpoint_dir):
     os.makedirs(checkpoint_dir)
-time_logging_file = 'runs/{0}/RNN/1/time.log'.format(dataset)
-config_logging_file = 'runs/{0}/RNN/1/config.log'.format(dataset)
+time_logging_file = 'runs/{0}/test/1/time.log'.format(dataset)
+config_logging_file = 'runs/{0}/test/1/config.log'.format(dataset)
 # SET UP LOGGING
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
@@ -35,7 +35,7 @@ config_handler.setLevel(logging.INFO)
 config_handler.setFormatter(config_formatter)
 logger.addHandler(config_handler)
 
-sample_len = 50
+sample_len = 4
 batch_size = 100
 attn_dim = 100
 # load data

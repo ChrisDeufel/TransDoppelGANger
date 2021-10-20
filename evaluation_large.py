@@ -24,13 +24,17 @@ def autocorr(x):
     return autocorr
 
 
-def plot_auto(data, file):
-    fig, axes = plt.subplots(1, 1, figsize=(12, 4))
-    for set in data:
-        axes.plot(set["auto_data"], color=set["color"], label=set["name"])
-    axes.legend()
-    axes.set_title("Autocorrelation")
-    plt.savefig("{0}.png".format(file))
+def plot_auto(data_real, data_fake):
+    assert len(data_real) == len(data_fake)
+    for i in range(len(data_real)):
+        assert data_real[i]["file"] == data_fake[i]["file"]
+        fig, axes = plt.subplots(1, 1, figsize=(12, 4))
+        axes.plot(data_real[i]["auto_data"], color=data_real[i]["color"], label=data_real[i]["name"])
+        axes.plot(data_fake[i]["auto_data"], color=data_fake[i]["color"], label=data_fake[i]["name"])
+        axes.legend()
+        axes.set_title("Autocorrelation")
+        file = data_real[i]["file"]
+        plt.savefig("{0}.png".format(file))
 
 
 def autocorrelation(dir, data, data_feature_output):
@@ -48,35 +52,39 @@ def autocorrelation(dir, data, data_feature_output):
         os.makedirs(dir)
     # dir = "{0}/{1}".format(dir, epoch)
     feature_dim = 0
+    data_to_plot = []
     for f in data_feature_output:
         if f.type_ == output.OutputType.DISCRETE:
             feature_dim += f.dim
             continue
-        data_to_plot = []
-        for set in data:
-            data_feature = set['data_feature']
-            data_feature = data_feature[:, :, feature_dim]
-            auto = np.apply_along_axis(func1d=autocorr, axis=1, arr=data_feature)
-            data_avg_auto = np.mean(auto, axis=0)
-            data_to_plot.append({"auto_data": data_avg_auto, "name": set['name'], "color": set['color']})
+        data_feature = data['data_feature']
+        data_feature = data_feature[:, :, feature_dim]
+        auto = np.apply_along_axis(func1d=autocorr, axis=1, arr=data_feature)
+        data_avg_auto = np.mean(auto, axis=0)
         file = "{0}/feature_{1}".format(dir, feature_dim)
         if not os.path.exists(file):
             os.makedirs(file)
         file = "{0}/{1}".format(file, epoch)
-        plot_auto(data=data_to_plot, file=file)
+        data_to_plot.append({"auto_data": data_avg_auto, "name": data['name'], "color": data['color'], "file": file})
         feature_dim += f.dim
+    return data_to_plot
 
 
 ### SEQUENCE LENGTH ###
-def plot_seq_len(data, file):
-    fig, axes = plt.subplots(1, 1, figsize=(12, 4))
-    for set in data:
-        data_bins = set['data_bins']
+def plot_seq_len(data_real, data_fake):
+    assert len(data_real) == len(data_fake)
+    for i in range(len(data_real)):
+        assert data_real[i]["file"] == data_fake[i]["file"]
+        fig, axes = plt.subplots(1, 1, figsize=(12, 4))
+        data_bins = data_real[i]['data_bins']
         x = np.arange(start=0, stop=len(data_bins), step=1)
-        axes.bar(x, data_bins, color=set['color'], label=set['name'], alpha=0.5)
-    axes.legend()
-    axes.set_title("Sequence Length")
-    plt.savefig('{0}.png'.format(file))
+        axes.bar(x, data_bins, color=data_real[i]['color'], label=data_real[i]['name'], alpha=0.5)
+        data_bins = data_fake[i]['data_bins']
+        x = np.arange(start=0, stop=len(data_bins), step=1)
+        axes.bar(x, data_bins, color=data_fake[i]['color'], label=data_fake[i]['name'], alpha=0.5)
+        axes.legend()
+        axes.set_title("Sequence Length")
+        plt.savefig('{0}.png'.format(data_real[i]["file"]))
 
 
 def sequence_length(dir, data):
@@ -92,13 +100,12 @@ def sequence_length(dir, data):
     if not os.path.exists(dir):
         os.makedirs(dir)
     data_to_plot = []
-    for set in data:
-        data_gen_flag = set["data_gen_flag"]
-        len = np.count_nonzero(data_gen_flag, axis=1)
-        data_bins = np.bincount(len)[:50]
-        data_to_plot.append({"data_bins": data_bins, "name": set['name'], "color": set['color']})
+    data_gen_flag = data["data_gen_flag"]
+    len = np.count_nonzero(data_gen_flag, axis=1)
+    data_bins = np.bincount(len)[:50]
     file = "{0}/epoch_{1}".format(dir, epoch)
-    plot_seq_len(data_to_plot, file)
+    data_to_plot.append({"data_bins": data_bins, "name": data['name'], "color": data['color'], "file": file})
+    return data_to_plot
 
 
 ### PEARSON CORRELATION ###
@@ -108,16 +115,25 @@ def pearson(x, y):
 
 
 # calculate and plot cdf from list
-def plot_cdf(data, file):
-    fig, axes = plt.subplots(1, 1, figsize=(12, 8))
-    for set in data:
-        pdf = set['pdf']
+def plot_cdf(data_real, data_fake):
+    assert len(data_real) == len(data_fake)
+    for i in range(len(data_real)):
+        assert data_real[i]["file"] == data_fake[i]["file"]
+        fig, axes = plt.subplots(1, 1, figsize=(12, 8))
+        # plot real
+        pdf = data_real[i]['pdf']
         Y = np.cumsum(pdf)
         X = np.arange(pdf.shape[0])
-        axes.plot(X, Y, color=set['color'], label=set['name'])
-    axes.legend()
-    axes.set_title("CDF")
-    plt.savefig('{0}.png'.format(file))
+        axes.plot(X, Y, color=data_real[i]['color'], label=data_real[i]['name'])
+        # plot fake
+        pdf = data_fake[i]['pdf']
+        Y = np.cumsum(pdf)
+        X = np.arange(pdf.shape[0])
+        axes.plot(X, Y, color=data_fake[i]['color'], label=data_fake[i]['name'])
+        axes.legend()
+        axes.set_title("CDF")
+        file = data_real[i]['file']
+        plt.savefig('{0}.png'.format(file))
 
 
 # TODO: beautify method
@@ -135,91 +151,72 @@ def cross_measurement(dir, data, nr_bins):
     dir = "{0}/{1}".format(eval_dir, "cross_meas_correlation")
     if not os.path.exists(dir):
         os.makedirs(dir)
-    nr_features = data[0]['data_feature'].shape[2]
+    nr_features = data['data_feature'].shape[2]
+    data_to_plot = []
     for f_1 in range(nr_features):
         for f_2 in range(f_1 + 1, nr_features):
-            data_to_plot = []
-            for set in data:
-                data_feature = set['data_feature']
-                data_gen_flag = set['data_gen_flag']
-                pearsons = np.zeros(nr_bins)
-                for i in range(data_feature.shape[0]):
-                    sequence = data_gen_flag[i, :]
-                    length = np.count_nonzero(sequence)
+            data_feature = data['data_feature']
+            data_gen_flag = data['data_gen_flag']
+            pearsons = np.zeros(nr_bins)
+            for i in range(data_feature.shape[0]):
+                sequence = data_gen_flag[i, :]
+                length = np.count_nonzero(sequence)
 
-                    x = data_feature[i, :length, f_1]
-                    y = data_feature[i, :length, f_2]
-                    if len(x) < 2 or len(y) < 2:
-                        continue
-                    pear, _ = pearson(x, y)
-                    if pear >= 0:
-                        bin = int((pear * (nr_bins / 2)) + (nr_bins / 2))
-                        if bin > (len(pearsons) - 1):
-                            pearsons[bin - 1] += 1
-                        else:
-                            pearsons[bin] += 1
-                    elif math.isnan(pear):
-                        pass
+                x = data_feature[i, :length, f_1]
+                y = data_feature[i, :length, f_2]
+                if len(x) < 2 or len(y) < 2:
+                    continue
+                pear, _ = pearson(x, y)
+                if pear >= 0:
+                    bin = int((pear * (nr_bins / 2)) + (nr_bins / 2))
+                    if bin > (len(pearsons) - 1):
+                        pearsons[bin - 1] += 1
                     else:
-                        bin = int((pear + 1) * (nr_bins / 2))
                         pearsons[bin] += 1
-                pearsons /= data_feature.shape[0]
-                data_to_plot.append({"pdf": pearsons, 'name': set['name'], 'color': set['color']})
+                elif math.isnan(pear):
+                    pass
+                else:
+                    bin = int((pear + 1) * (nr_bins / 2))
+                    pearsons[bin] += 1
+            pearsons /= data_feature.shape[0]
             file = "{0}/feature{1}_feature{2}".format(dir, f_1, f_2)
             if not os.path.exists(file):
                 os.makedirs(file)
             file = "{0}/{1}".format(file, epoch)
-            plot_cdf(data=data_to_plot, file=file)
+            data_to_plot.append({"pdf": pearsons, 'name': data['name'], 'color': data['color'], 'file': file})
+    return data_to_plot
 
 
 ### PLOT MEASUREMENT DISTRIBUTION OR METADATA DISTRIBUTION ###
-def plot_distribution(data, file, title, normalization=None):
-    fig, axes = plt.subplots(1, 1, figsize=(12, 4))
-    bins = None
-    for set in data:
-        bins = set['bins']
+def plot_distribution(data_real, data_fake, title):
+    assert len(data_real) == len(data_fake)
+    for i in range(len(data_real)):
+        assert data_real[i]["file"] == data_fake[i]["file"]
+        file = data_real[i]["file"]
+        fig, axes = plt.subplots(1, 1, figsize=(12, 4))
+        bins = None
+        bins = data_real[i]['bins']
         y_pos = np.arange(len(bins))
-        # y_pos = np.linspace(-1, 1, len(bins))
-        axes.bar(y_pos, bins, color=set['color'], label=set['name'], alpha=0.5)
-    axes.legend()
-    axes.set_title(title)
-    if normalization is not None:
-        x_ticks = range(0, len(bins) + 1, int(len(bins) / 4))
-        if normalization == output.Normalization.ZERO_ONE:
-            x_labels = ['0', '0.25', '0.5', '0.75', '1']
+        axes.bar(y_pos, bins, color=data_real[i]['color'], label=data_real[i]['name'], alpha=0.5)
+
+        bins = data_fake[i]['bins']
+        y_pos = np.arange(len(bins))
+        axes.bar(y_pos, bins, color=data_fake[i]['color'], label=data_fake[i]['name'], alpha=0.5)
+
+        axes.legend()
+        axes.set_title(title)
+        if 'normalization' in data_real[i]:
+            normalization = data_real[i]['normalization']
         else:
-            x_labels = ['-1', '-0.5', '0', '0.5', '1']
-        plt.xticks(x_ticks, x_labels)
-    plt.savefig('{0}.png'.format(file))
-
-
-def plot_distribution_2(data, file, title, normalization=None):
-    fig, axes = plt.subplots(len(data) - 1, 1, figsize=(12, 4))
-    bins = None
-    # real data must always the first dic in the data list
-    for i in range(len(axes)):
-        ax = axes[i]
-        # plot real data
-        set = data[0]
-        bins = set['bins']
-        y_pos = np.arange(len(bins))
-        ax.bar(y_pos, bins, color=set['color'], label=set['name'], alpha=0.5)
-        # plot current fake data
-        set = data[i + 1]
-        bins = set['bins']
-        y_pos = np.arange(len(bins))
-        ax.bar(y_pos, bins, color=set['color'], label=set['name'], alpha=0.5)
-        ax.legend()
-    axes.set_title(title)
-
-    if normalization is not None:
-        x_ticks = range(0, len(bins) + 1, int(len(bins) / 4))
-        if normalization == output.Normalization.ZERO_ONE:
-            x_labels = ['0', '0.25', '0.5', '0.75', '1']
-        else:
-            x_labels = ['-1', '-0.5', '0', '0.5', '1']
-        plt.xticks(x_ticks, x_labels)
-    plt.savefig('{0}.png'.format(file))
+            normalization = None
+        if normalization is not None:
+            x_ticks = range(0, len(bins) + 1, int(len(bins) / 4))
+            if normalization == output.Normalization.ZERO_ONE:
+                x_labels = ['0', '0.25', '0.5', '0.75', '1']
+            else:
+                x_labels = ['-1', '-0.5', '0', '0.5', '1']
+            plt.xticks(x_ticks, x_labels)
+        plt.savefig('{0}.png'.format(file))
 
 
 def measurement_distribution(dir, data, feature_output, nr_bins=100):
@@ -232,37 +229,37 @@ def measurement_distribution(dir, data, feature_output, nr_bins=100):
     # dir = "{0}/{1}".format(dir, epoch)
     dim = 0
     counter = 0
+    data_to_plot = []
     for f in feature_output:
         if f.type_ == output.OutputType.DISCRETE:
             dim += f.dim
             continue
-        data_to_plot = []
-        for set in data:
-            data_feature = set['data_feature']
-            bins = np.zeros(nr_bins)
-            for j in range(len(data_feature)):
-                feature = data_feature[j, :, dim]
-                max = feature.max()
-                min = feature.min()
-                value = (max + min) / 2
-                if f.normalization == output.Normalization.ZERO_ONE:
-                    bin = int(value * nr_bins)
-                    bins[bin] += 1
+        data_feature = data['data_feature']
+        bins = np.zeros(nr_bins)
+        for j in range(len(data_feature)):
+            feature = data_feature[j, :, dim]
+            max = feature.max()
+            min = feature.min()
+            value = (max + min) / 2
+            if f.normalization == output.Normalization.ZERO_ONE:
+                bin = int(value * nr_bins)
+                bins[bin] += 1
+            else:
+                if value >= 0:
+                    bin = int((value * (nr_bins / 2)) + (nr_bins / 2))
                 else:
-                    if value >= 0:
-                        bin = int((value * (nr_bins / 2)) + (nr_bins / 2))
-                    else:
-                        bin = int((value + 1) * (nr_bins / 2))
-                    bins[bin] += 1
-            data_to_plot.append({'bins': bins, 'name': set['name'], 'color': set['color']})
+                    bin = int((value + 1) * (nr_bins / 2))
+                bins[bin] += 1
+
         dim += f.dim
         file = "{0}/feature_{1}".format(dir, counter)
         if not os.path.exists(file):
             os.makedirs(file)
         file = "{0}/{1}".format(file, epoch)
-        plot_distribution(data=data_to_plot, file=file,
-                          title="measurement_distribution", normalization=f.normalization)
+        data_to_plot.append({'bins': bins, 'name': data['name'], 'color': data['color'], 'file': file,
+                             'normalization': f.normalization})
         counter += 1
+    return data_to_plot
 
 
 def metadata_distribution(dir, data, attribute_output):
@@ -281,26 +278,24 @@ def metadata_distribution(dir, data, attribute_output):
     # dir = "{0}/{1}".format(dir, epoch)
     dim = 0
     counter = 0
+    data_to_plot = []
     for i in attribute_output:
         dim_range = dim + i.dim
-        data_to_plot = []
-        for set in data:
-            data_attribute = set['data_attribute']
-            data_attribute = data_attribute[:, dim:dim_range]
-            indices = np.argmax(data_attribute, axis=1)
-            one_hot = np.zeros(data_attribute.shape)
-            one_hot[np.arange(indices.size), indices] = 1
-            data_attribute = one_hot
-            bins = np.sum(data_attribute, axis=0)
-            data_to_plot.append({'bins': bins, 'name': set['name'], 'color': set['color']})
+        data_attribute = data['data_attribute']
+        data_attribute = data_attribute[:, dim:dim_range]
+        indices = np.argmax(data_attribute, axis=1)
+        one_hot = np.zeros(data_attribute.shape)
+        one_hot[np.arange(indices.size), indices] = 1
+        data_attribute = one_hot
+        bins = np.sum(data_attribute, axis=0)
         file = "{0}/attribute_{1}".format(dir, counter)
         if not os.path.exists(file):
             os.makedirs(file)
         file = "{0}/{1}".format(file, epoch)
-        plot_distribution(data=data_to_plot, file=file,
-                          title="metadata_distribution")
+        data_to_plot.append({'bins': bins, 'name': data['name'], 'color': data['color'], 'file': file})
         dim += i.dim
         counter += 1
+    return data_to_plot
 
 
 ### MEASUREMENT METADATA CORRELATIONS ###
@@ -511,68 +506,82 @@ def mse_autocorrelation(dir, real_data_features, sample_data_features, data_feat
     df.to_csv('{0}/mse_auto.csv'.format(dir), sep=';')
 
 
-# load web dataset for testing
-dataset = 'google_m'
+for n in range(1, 2, 1):
+    for i in range(0, 500, 20):
+        # load web dataset for testing
+        dataset = 'google_m'
 
-# load original data
-(data_feature, data_attribute, data_gen_flag, data_feature_outputs, data_attribute_outputs) = \
-    load_data("data/{0}".format(dataset))
+        # load original data
+        (data_feature, data_attribute, data_gen_flag, data_feature_outputs, data_attribute_outputs) = \
+            load_data("data/{0}".format(dataset))
 
-# if normalization needed
-#(data_feature, data_attribute, data_attribute_outputs, real_attribute_mask) = \
-#    normalize_per_sample(data_feature, data_attribute, data_feature_outputs, data_attribute_outputs)
+        # if normalization needed
+        # (data_feature, data_attribute, data_attribute_outputs, real_attribute_mask) = \
+        #    normalize_per_sample(data_feature, data_attribute, data_feature_outputs, data_attribute_outputs)
 
-# for n in range(1, 2, 1):
-#     for i in range(0, 500, 20):
-# load generated data
-#sample_path = 'runs/google_m/RNN/{}/checkpoint/epoch_{}/generated_samples.npz'.format(n, i)
-sample_path = 'runs/google_m/RNN/1/checkpoint/epoch_20/generated_samples.npz'
-sampled_data = np.load(sample_path)
+        sample_path = 'runs/{}/RNN/{}/checkpoint/epoch_{}/generated_samples.npz'.format(dataset, n, i)
+        # sample_path = 'runs/google_m/RNN/1/checkpoint/epoch_20/generated_samples.npz'
 
-sampled_features = sampled_data['sampled_features']
-sampled_attributes = sampled_data['sampled_attributes']
-sampled_gen_flags = sampled_data['sampled_gen_flags']
-sampled_lengths = sampled_data['sampled_lengths']
+        # create folder to save data
+        run_dir = "{}/{}".format(sample_path.split("/")[2], sample_path.split("/")[3])
+        epoch_id = sample_path.split("/")[5]
+        evaluation_dir = "evaluation/{0}/{1}".format(dataset, run_dir)
+        if not os.path.exists(evaluation_dir):
+            os.makedirs(evaluation_dir)
+        evaluation_dir = "{0}/{1}".format(evaluation_dir, epoch_id)
+        data = {
+            'data_feature': data_feature,
+            'data_attribute': data_attribute,
+            'data_gen_flag': data_gen_flag,
+            'color': 'yellow',
+            'name': 'REAL'
+        }
+        # generate real data eval
+        # real_data_to_plot = autocorrelation(dir=evaluation_dir, data=data, data_feature_output=data_feature_outputs)
+        # real_data_to_plot = sequence_length(dir=evaluation_dir, data=data)
+        # real_data_to_plot = measurement_distribution(dir=evaluation_dir, data=data, feature_output=data_feature_outputs)
+        # real_data_to_plot = metadata_distribution(dir=evaluation_dir, data=data, attribute_output=data_attribute_outputs)
+        real_data_to_plot = cross_measurement(dir=evaluation_dir, data=data, nr_bins=100)
+        data = None
+        data_feature = None
+        data_attribute = None
+        # load generated data
+        sampled_data = np.load(sample_path)
+        sampled_features = sampled_data['sampled_features']
+        sampled_attributes = sampled_data['sampled_attributes']
+        sampled_gen_flags = sampled_data['sampled_gen_flags']
+        sampled_lengths = sampled_data['sampled_lengths']
+        # append sampled data
+        data = {
+            'data_feature': sampled_features,
+            'data_attribute': sampled_attributes,
+            'data_gen_flag': sampled_gen_flags,
+            'data_lengths': sampled_lengths,
+            'color': 'blue',
+            'name': 'torchDoppelGANger'
+        }
+        # fake_data_to_plot = autocorrelation(dir=evaluation_dir, data=data, data_feature_output=data_feature_outputs)
+        # fake_data_to_plot = sequence_length(dir=evaluation_dir, data=data)
+        # fake_data_to_plot = measurement_distribution(dir=evaluation_dir, data=data, feature_output=data_feature_outputs)
+        # fake_data_to_plot = metadata_distribution(dir=evaluation_dir, data=data,
+        #                                           attribute_output=data_attribute_outputs)
+        fake_data_to_plot = cross_measurement(dir=evaluation_dir, data=data, nr_bins=100)
+        # plot_auto(data_real=real_data_to_plot, data_fake=fake_data_to_plot)
+        # plot_seq_len(data_real=real_data_to_plot, data_fake=fake_data_to_plot)
+        # plot_distribution(data_real=real_data_to_plot, data_fake=fake_data_to_plot, title="measurement_distribution")
+        # plot_distribution(data_real=real_data_to_plot, data_fake=fake_data_to_plot, title="metadata_distribution")
+        plot_cdf(data_real=real_data_to_plot, data_fake=fake_data_to_plot)
 
-# generate list of dictionaries
-data = []
-# append real data
-data.append({
-    'data_feature': data_feature,
-    'data_attribute': data_attribute,
-    'data_gen_flag': data_gen_flag,
-    'color': 'yellow',
-    'name': 'REAL'
-})
-# append sampled data
-data.append({
-    'data_feature': sampled_features,
-    'data_attribute': sampled_attributes,
-    'data_gen_flag': sampled_gen_flags,
-    'data_lengths': sampled_lengths,
-    'color': 'blue',
-    'name': 'torchDoppelGANger'
-})
-# create folder to save data
-run_dir = "{}/{}".format(sample_path.split("/")[2], sample_path.split("/")[3])
-epoch_id = sample_path.split("/")[5]
-evaluation_dir = "evaluation/{0}/{1}".format(dataset, run_dir)
-if not os.path.exists(evaluation_dir):
-    os.makedirs(evaluation_dir)
-evaluation_dir = "{0}/{1}".format(evaluation_dir, epoch_id)
-# if not os.path.exists(evaluation_dir):
-#     os.makedirs(evaluation_dir)
+        # call methods
+        # metadata_distribution(dir=evaluation_dir, data=data, attribute_output=data_attribute_outputs)
+        # sequence_length(dir=evaluation_dir, data=data)
+        # cross_measurement(dir=evaluation_dir, data=data, nr_bins=100)
+        # measurement_distribution(dir=evaluation_dir, data=data, feature_output=data_feature_outputs)
+        # autocorrelation(dir=evaluation_dir, data=data, data_feature_output=data_feature_outputs)
+        # nearest_neighbors(dir=evaluation_dir, real_data_features=data_feature, sampled_data_features=sampled_features,
+        #                   data_feature_outputs=data_feature_outputs)
+        # meta_meas_corr(dir=evaluation_dir, data=data, data_attribute_outputs=data_attribute_outputs,
+        #               data_feature_outputs=data_feature_outputs)
 
-# call methods
-#metadata_distribution(dir=evaluation_dir, data=data, attribute_output=data_attribute_outputs)
-#sequence_length(dir=evaluation_dir, data=data)
-cross_measurement(dir=evaluation_dir, data=data, nr_bins=100)
-#measurement_distribution(dir=evaluation_dir, data=data, feature_output=data_feature_outputs)
-#autocorrelation(dir=evaluation_dir, data=data, data_feature_output=data_feature_outputs)
-# nearest_neighbors(dir=evaluation_dir, real_data_features=data_feature, sampled_data_features=sampled_features,
-#                   data_feature_outputs=data_feature_outputs)
-#meta_meas_corr(dir=evaluation_dir, data=data, data_attribute_outputs=data_attribute_outputs,
-#               data_feature_outputs=data_feature_outputs)
-
-    # mse_autocorrelation(dir=evaluation_dir, real_data_features=data_feature, sample_data_features=sampled_features,
-    #                    data_feature_outputs=data_feature_outputs)
+        # mse_autocorrelation(dir=evaluation_dir, real_data_features=data_feature, sample_data_features=sampled_features,
+        #                    data_feature_outputs=data_feature_outputs)

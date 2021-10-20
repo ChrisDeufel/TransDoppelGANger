@@ -1,6 +1,8 @@
 from output import OutputType, Output, Normalization
 import numpy as np
 import matplotlib
+import os
+
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
@@ -76,7 +78,7 @@ def draw_feature(data, lengths, outputs, path=None):
                 plt.plot(
                     range(int(lengths[j])),
                     np.argmax(data[j][:int(lengths[j]),
-                                      id_: id_ + outputs[i].dim],
+                              id_: id_ + outputs[i].dim],
                               axis=1),
                     "o-",
                     markersize=3,
@@ -185,7 +187,53 @@ def normalize_per_sample(data_feature, data_attribute, data_feature_outputs,
     data_attribute_outputs.extend(additional_attribute_outputs)
 
     return data_feature, data_attribute, data_attribute_outputs, \
-        real_attribute_mask
+           real_attribute_mask
+
+
+def normalize_per_sample_ext(path, nr_users, data_feature_outputs, data_attribute_outputs, eps=1e-4):
+    # create folder for normalized samples if not exists
+    if not os.path.exists("{}/normalized".format(path)):
+        os.makedirs("{}/normalized".format(path))
+    # assume all samples have maximum length
+    additional_attribute = []
+    additional_attribute_outputs = []
+
+    dim = 0
+    for output in data_feature_outputs:
+        if output.type_ == OutputType.CONTINUOUS:
+            for _ in range(output.dim):
+                for u in range(nr_users):
+                    attributes = np.load("{}/{}_data_attribute.npy".format(path, u))
+                    features = np.load("{}/{}_data_feature.npy".format(path, u))
+                    max_ = np.amax(features, axis=0)[dim] + eps
+                    min_ = np.amin(features, axis=0)[dim] - eps
+                    attributes = np.concatenate((attributes, (max_ + min_) / 2.0), axis=1)
+                    attributes = np.concatenate((attributes, (max_ - min_) / 2.0), axis=1)
+                    features[:, dim] = \
+                        (features[:, dim] - min_) / (max_ - min_)
+                    if output.normalization == Normalization.MINUSONE_ONE:
+                        features[:, dim] = \
+                            features[:, dim] * 2.0 - 1.0
+                    # save normalized sample
+                    np.save("{}/normalized/{}_data_attribute_norm.npy".format(path, u), attributes)
+                    np.save("{}/normalized/{}_data_feature_norm.npy".format(path, u), features)
+                additional_attribute_outputs.append(Output(
+                    type_=OutputType.CONTINUOUS,
+                    dim=1,
+                    normalization=output.normalization,
+                    is_gen_flag=False))
+                additional_attribute_outputs.append(Output(
+                    type_=OutputType.CONTINUOUS,
+                    dim=1,
+                    normalization=Normalization.ZERO_ONE,
+                    is_gen_flag=False))
+
+                dim += 1
+        else:
+            dim += output.dim
+    real_attribute_mask = ([True] * len(data_attribute_outputs) +
+                           [False] * len(additional_attribute_outputs))
+
 
 
 def add_gen_flag(data_feature, data_gen_flag, data_feature_outputs,

@@ -9,12 +9,12 @@ from util import normalize_per_sample, add_gen_flag
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
 # device = 'cpu'
-sample_len = 10
-batch_size = 100
+sample_len = 4
+batch_size = 10
 
 # noise_dim = 5
 # load data
-dataset = 'web'
+dataset = 'FCC_MBA'
 attn_dim = 100
 # load data
 # dataset = Data(sample_len=sample_len, name=dataset)
@@ -45,7 +45,7 @@ attr_discriminator = AttrDiscriminator(data_attribute)
 #                                            sample_len=sample_len, num_heads=num_heads, attn_dim=attn_dim)
 generator = DoppelGANgerGeneratorRNN(noise_dim=noise_dim, feature_outputs=data_feature_outputs,
                                      attribute_outputs=data_attribute_outputs,
-                                     real_attribute_mask=real_attribute_mask, device=device, sample_len=10)
+                                     real_attribute_mask=real_attribute_mask, device=device, sample_len=sample_len)
 
 # define optimizer
 g_lr = 0.001
@@ -70,9 +70,9 @@ g_attr_d_coe = 1.0
 extra_checkpoint_freq = 5
 num_packing = 1
 
-for n in range(1, 3, 1):
-    for i in range(0, 500, 10):
-        model_dir = "runs/web/RNN/{}/checkpoint/epoch_{}".format(n, i)
+for n in range(1, 2, 1):
+    for i in range(0, 500, 20):
+        model_dir = "runs/FCC_MBA/test/{}/checkpoint/epoch_{}".format(n, i)
         trainer = Trainer(discriminator=discriminator, attr_discriminator=attr_discriminator, generator=generator,
                           criterion=None, dis_optimizer=attr_opt, addi_dis_optimizer=d_attr_opt, gen_optimizer=gen_opt,
                           real_train_dl=None, data_feature_shape=data_feature_shape, device=device,
