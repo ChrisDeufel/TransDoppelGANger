@@ -101,6 +101,9 @@ class SplitData(Dataset):
                 with open("{}/normalized/data_feature_output.pkl".format(self.data_path),
                           "rb") as f:
                     self.data_feature_outputs = pickle.load(f)
+                with open("{}/normalized/data_attribute_output.pkl".format(self.data_path),
+                          "rb") as f:
+                    self.data_attribute_outputs = pickle.load(f)
                 self.real_attribute_mask = np.load("{}/normalized/real_attribute_mask.npy".format(self.data_path))
             self.data_path = "{}/normalized".format(self.data_path)
         if gen_flag:
