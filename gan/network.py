@@ -13,14 +13,14 @@ from gan.modules import MultiHeadAttention
 
 # Discriminator
 class Discriminator(nn.Module):
-    def __init__(self, input_feature, input_attribute, num_layers=5, num_units=200,
+    def __init__(self, input_feature_shape, input_attribute_shape, num_layers=5, num_units=200,
                  scope_name="discriminator", *args, **kwargs):
         super(Discriminator, self).__init__()
         self.scope_name = scope_name
         # only saved for adding to summary writer (see trainer.train)
-        self.input_feature_shape = input_feature.shape
-        self.input_attribute_shape = input_attribute.shape
-        self.input_size = input_feature.shape[1] * input_feature.shape[2] + input_attribute.shape[1]
+        self.input_feature_shape = input_feature_shape
+        self.input_attribute_shape = input_attribute_shape
+        self.input_size = input_feature_shape[1] * input_feature_shape[2] + input_attribute_shape[1]
         modules = [nn.Linear(self.input_size, num_units), nn.ReLU()]
         for i in range(num_layers - 2):
             modules.append(nn.Linear(num_units, num_units))
@@ -39,11 +39,11 @@ class Discriminator(nn.Module):
 
 
 class AttrDiscriminator(nn.Module):
-    def __init__(self, input_attribute, num_layers=5, num_units=200, scope_name="attrDiscriminator", *args, **kwargs):
+    def __init__(self, input_attribute_shape, num_layers=5, num_units=200, scope_name="attrDiscriminator", *args, **kwargs):
         super(AttrDiscriminator, self).__init__()
         self.scope_name = scope_name
         # only saved for adding to summary writer (see trainer.train)
-        self.input_size = input_attribute.shape[1]
+        self.input_size = input_attribute_shape[1]
         modules = [nn.Linear(self.input_size, num_units), nn.ReLU()]
         for i in range(num_layers - 2):
             modules.append(nn.Linear(num_units, num_units))

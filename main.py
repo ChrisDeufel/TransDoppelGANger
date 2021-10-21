@@ -2,7 +2,7 @@ from torch.utils.data import DataLoader
 import torch
 import logging
 from load_data import load_data
-from data import Data, LargeData
+from data import Data, LargeData, SplitData
 from trainer import Trainer, add_handler_trainer
 from gan.network import Discriminator, AttrDiscriminator, DoppelGANgerGeneratorAttention, DoppelGANgerGeneratorRNN
 from util import add_gen_flag, normalize_per_sample
@@ -10,7 +10,7 @@ import os
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
 # device = 'cpu'
-dataset = "FCC_MBA"
+dataset = "transactions"
 checkpoint_dir = 'runs/{0}/test/1/checkpoint'.format(dataset)
 if not os.path.exists(checkpoint_dir):
     os.makedirs(checkpoint_dir)
@@ -36,10 +36,11 @@ config_handler.setFormatter(config_formatter)
 logger.addHandler(config_handler)
 
 sample_len = 4
-batch_size = 100
+batch_size = 10
 attn_dim = 100
 # load data
-dataset = Data(sample_len=sample_len, name=dataset)
+#dataset = Data(sample_len=sample_len, name=dataset)
+dataset = SplitData(sample_len, name=dataset)
 real_train_dl = DataLoader(dataset=dataset, batch_size=batch_size, shuffle=True)
 
 #noise_dim = attn_dim - dataset.data_attribute.shape[1]
@@ -53,9 +54,9 @@ logger.info("Attention Mask: {0}".format(attn_mask))
 logger.info("Number of Attention Heads: {0}".format(num_heads))
 
 # generate discriminators and generator
-discriminator = Discriminator(dataset.data_feature, dataset.data_attribute)
+discriminator = Discriminator(dataset.data_feature_shape, dataset.data_attribute_shape)
 logger.info("DISCRIMINATOR: {0}".format(discriminator))
-attr_discriminator = AttrDiscriminator(dataset.data_attribute)
+attr_discriminator = AttrDiscriminator(dataset.data_attribute_shape)
 logger.info("ATTRIBUTE DISCRIMINATOR: {0}".format(attr_discriminator))
 # generator = DoppelGANgerGeneratorAttention(noise_dim=noise_dim, feature_outputs=dataset.data_feature_outputs,
 #                                            attribute_outputs=dataset.data_attribute_outputs,
@@ -82,7 +83,7 @@ attr_opt = torch.optim.Adam(discriminator.parameters(), lr=d_lr, betas=(0.5, 0.9
 d_attr_opt = torch.optim.Adam(attr_discriminator.parameters(), lr=attr_d_lr, betas=(0.5, 0.999))
 gen_opt = torch.optim.Adam(generator.parameters(), lr=g_lr, betas=(0.5, 0.999))
 
-data_feature_shape = dataset.data_feature.shape
+data_feature_shape = dataset.data_feature_shape
 # define Hyperparameters
 epoch = 500
 d_rounds = 1

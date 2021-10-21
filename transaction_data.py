@@ -3,7 +3,7 @@ import pandas as pd
 import tqdm
 import numpy as np
 import pickle
-from gan.output import Output, OutputType, Normalization
+from output import Output, OutputType, Normalization
 
 ########### prepare transaction dataset for DoppelGANger framework ###########
 # utils
@@ -70,7 +70,7 @@ amount = data['Amount'].to_numpy().astype(np.float)
 amount = np.reshape(amount, (amount.shape[0], 1))
 data_feature = np.concatenate((data_feature, amount), axis=1)
 # add to meta data and write to text file
-data_feature_outputs.append(Output(type_=OutputType.CONTINUOUS, dim=1, normalization=Normalization.ZERO_ONE))
+data_feature_outputs.append(Output(type_=OutputType.CONTINUOUS, dim=1, normalization=Normalization.MINUSONE_ONE))
 des.write("Feature - Column 0: Amount\n")
 amount = None
 
@@ -98,6 +98,15 @@ for col_name in tqdm.tqdm(sub_columns):
 data = None
 col_data = None
 
+# save numpy arrays and output objects
+dbfile = open('data/transactions/data_attribute_output.pkl', 'ab')
+# source, destination
+pickle.dump(data_attribute_outputs, dbfile)
+dbfile.close()
+# source, destination
+dbfile = open('data/transactions/data_feature_output.pkl', 'ab')
+pickle.dump(data_feature_outputs, dbfile)
+dbfile.close()
 # determine max len of transactions for one user
 user = data_feature[:, 0].astype(int)
 user_count = np.bincount(user)
@@ -110,31 +119,26 @@ max_user = np.argmax(user_count)
 data_feature = data_feature[:, 1:]
 
 # instantiate and fill final arrays
+data_gen_flags = np.zeros((nr_user, max_len))
 #data_attribute_final = np.reshape(np.arange(nr_user), (nr_user, 1))
 #data_feature_final = np.zeros((nr_user, max_len, data_feature.shape[1]))
 #data_gen_flag = np.zeros((nr_user, max_len))
 current = 0
 for u in range(nr_user):
-    feature = np.zeros((max_len, data_feature.shape[1]))
+    #feature = np.zeros((max_len, data_feature.shape[1]))
     seq_len = max_len
     if user_count[u] < seq_len:
         seq_len = user_count[u]
+    data_gen_flags[u, :seq_len] = 1
     data_u = data_feature[current:current + seq_len]
-    feature[:seq_len, :] = data_u
+    #feature[:seq_len, :] = data_u
     #data_feature_final[u, :seq_len, :] = np.reshape(data_u, (1, seq_len, data_feature.shape[1]))
     #data_gen_flag[u, :seq_len] = 1
-    np.save("data/transactions/{}_data_feature.npy".format(u), feature)
+    #np.save("data/transactions/{}_data_feature.npy".format(u), feature)
     current += user_count[u]
+np.save("data/transactions/data_gen_flag.npy", data_gen_flags)
 
-# save numpy arrays and output objects
-dbfile = open('data_attribute_output.pkl', 'ab')
-# source, destination
-pickle.dump(data_attribute_outputs, dbfile)
-dbfile.close()
-dbfile = open('data_feature_output.pkl', 'ab')
-# source, destination
-pickle.dump(data_feature_outputs, dbfile)
-dbfile.close()
+
 
 #np.save('transactions_features.npy', data_feature_final)
 #np.save('transactions_attributes.npy', data_attribute_final)

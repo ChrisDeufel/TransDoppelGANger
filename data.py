@@ -1,9 +1,10 @@
 from torch.utils.data import Dataset
 import torch
 from load_data import load_data
-from util import add_gen_flag, normalize_per_sample
+from util import add_gen_flag, add_gen_flag_split, normalize_per_sample, normalize_per_sample_split
 import numpy as np
 import os
+import pickle
 import copy
 
 
@@ -27,6 +28,8 @@ class Data(Dataset):
         if gen_flag:
             self.data_feature, self.data_feature_outputs = add_gen_flag(self.data_feature, self.data_gen_flag,
                                                                         self.data_feature_outputs, sample_len)
+        self.data_feature_shape = self.data_feature.shape
+        self.data_attribute_shape = self.data_attribute.shape
 
     def __getitem__(self, idx):
         attribute = torch.Tensor(self.data_attribute[idx, :])
@@ -45,7 +48,7 @@ class LargeData(Dataset):
                  name='google_split'):
         self.transforms = transforms
         self.splits = int(splits)
-        self.nr_samples = nr_samples*self.splits
+        self.nr_samples = nr_samples * self.splits
         self.split_size = int(self.nr_samples / self.splits)
         self.name = name
         self.normalize = normalize
@@ -70,3 +73,57 @@ class LargeData(Dataset):
         return self.nr_samples
 
 
+class SplitData(Dataset):
+    def __init__(self, sample_len, transforms=None, normalize=True, gen_flag=True, size=None, name='transactions'):
+        # count number of samples for this dataset
+        self.normalize = normalize
+        self.gen_flag = gen_flag
+        self.data_path = "data/{}".format(name)
+        self.nr_samples = 0
+        for item in os.listdir(self.data_path):
+            if "feature.npy" in item:
+                self.nr_samples += 1
+        self.nr_samples = int(self.nr_samples)
+        # load output files and gen flags
+        self.data_gen_flag = np.load("data/{}/data_gen_flag.npy".format(name))
+        with open(os.path.join(self.data_path, "data_feature_output.pkl"), "rb") as f:
+            self.data_feature_outputs = pickle.load(f)
+        with open(os.path.join(self.data_path,
+                               "data_attribute_output.pkl"), "rb") as f:
+            self.data_attribute_outputs = pickle.load(f)
+        if normalize:
+            if not os.path.exists("data/{}/normalized".format(name)):
+                self.data_attribute_outputs, self.real_attribute_mask = normalize_per_sample_split(path=self.data_path,
+                                                                                                   nr_samples=self.nr_samples,
+                                                                                                   data_feature_outputs=self.data_feature_outputs,
+                                                                                                   data_attribute_outputs=self.data_attribute_outputs)
+            else:
+                with open("{}/normalized/data_feature_output.pkl".format(self.data_path),
+                          "rb") as f:
+                    self.data_feature_outputs = pickle.load(f)
+                self.real_attribute_mask = np.load("{}/normalized/real_attribute_mask.npy".format(self.data_path))
+            self.data_path = "{}/normalized".format(self.data_path)
+        if gen_flag:
+            if not os.path.exists("{}/gen_flag".format(self.data_path)):
+                self.data_feature_outputs = add_gen_flag_split(self.data_path, self.nr_samples, self.data_gen_flag,
+                                                               self.data_feature_outputs, sample_len)
+            else:
+                with open("{}/gen_flag/data_feature_output.pkl".format(self.data_path), "rb") as f:
+                    self.data_feature_outputs = pickle.load(f)
+
+        ################ WALKAROUND TO PROVIDE VARIABLES NECESSARY FOR ARCHITECTURES ################
+        #TODO: find other way to provide variables
+        self.rand_data_feature = np.load("{}/0_data_feature.npy".format(self.data_path))
+        self.rand_data_attribute = np.load("{}/0_data_attribute.npy".format(self.data_path))
+        self.data_feature_shape = (self.nr_samples, self.rand_data_feature.shape[0], self.rand_data_feature.shape[1])
+        self.data_attribute_shape = (self.nr_samples, self.rand_data_attribute.shape[0])
+
+
+    def __getitem__(self, idx):
+        if self.normalize and self.gen_flag:
+            feature = np.load("{}/gen_flag/{}_data_feature.npy".format(self.data_path, idx))
+            attribute = np.load("{}/{}_data_attribute.npy".format(self.data_path, idx))
+        return torch.Tensor(attribute), torch.Tensor(feature)
+
+    def __len__(self):
+        return self.nr_samples

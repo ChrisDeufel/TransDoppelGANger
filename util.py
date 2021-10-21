@@ -2,6 +2,7 @@ from output import OutputType, Output, Normalization
 import numpy as np
 import matplotlib
 import os
+import pickle
 
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
@@ -190,33 +191,32 @@ def normalize_per_sample(data_feature, data_attribute, data_feature_outputs,
            real_attribute_mask
 
 
-def normalize_per_sample_ext(path, nr_users, data_feature_outputs, data_attribute_outputs, eps=1e-4):
+def normalize_per_sample_split(path, nr_samples, data_feature_outputs, data_attribute_outputs, eps=1e-4):
     # create folder for normalized samples if not exists
     if not os.path.exists("{}/normalized".format(path)):
         os.makedirs("{}/normalized".format(path))
     # assume all samples have maximum length
-    additional_attribute = []
     additional_attribute_outputs = []
 
     dim = 0
     for output in data_feature_outputs:
         if output.type_ == OutputType.CONTINUOUS:
             for _ in range(output.dim):
-                for u in range(nr_users):
+                for u in range(nr_samples):
                     attributes = np.load("{}/{}_data_attribute.npy".format(path, u))
                     features = np.load("{}/{}_data_feature.npy".format(path, u))
-                    max_ = np.amax(features, axis=0)[dim] + eps
-                    min_ = np.amin(features, axis=0)[dim] - eps
-                    attributes = np.concatenate((attributes, (max_ + min_) / 2.0), axis=1)
-                    attributes = np.concatenate((attributes, (max_ - min_) / 2.0), axis=1)
+                    max_ = np.expand_dims(np.array(np.amax(features, axis=0)[dim] + eps), axis=0)
+                    min_ = np.expand_dims(np.array(np.amin(features, axis=0)[dim] - eps), axis=0)
+                    attributes = np.concatenate((attributes, (max_ + min_) / 2.0), axis=0)
+                    attributes = np.concatenate((attributes, (max_ - min_) / 2.0), axis=0)
                     features[:, dim] = \
                         (features[:, dim] - min_) / (max_ - min_)
                     if output.normalization == Normalization.MINUSONE_ONE:
                         features[:, dim] = \
                             features[:, dim] * 2.0 - 1.0
                     # save normalized sample
-                    np.save("{}/normalized/{}_data_attribute_norm.npy".format(path, u), attributes)
-                    np.save("{}/normalized/{}_data_feature_norm.npy".format(path, u), features)
+                    np.save("{}/normalized/{}_data_attribute.npy".format(path, u), attributes)
+                    np.save("{}/normalized/{}_data_feature.npy".format(path, u), features)
                 additional_attribute_outputs.append(Output(
                     type_=OutputType.CONTINUOUS,
                     dim=1,
@@ -227,13 +227,70 @@ def normalize_per_sample_ext(path, nr_users, data_feature_outputs, data_attribut
                     dim=1,
                     normalization=Normalization.ZERO_ONE,
                     is_gen_flag=False))
-
                 dim += 1
         else:
             dim += output.dim
     real_attribute_mask = ([True] * len(data_attribute_outputs) +
                            [False] * len(additional_attribute_outputs))
+    np.save('{}/normalized/real_attribute_mask.npy'.format(path), real_attribute_mask)
+    data_attribute_outputs.extend(additional_attribute_outputs)
+    # drop output files in normalized folder
+    dbfile = open('{}/normalized/data_attribute_output.pkl'.format(path), 'ab')
+    # source, destination
+    pickle.dump(data_attribute_outputs, dbfile)
+    dbfile.close()
+    # source, destination
+    dbfile = open('{}/normalized/data_feature_output.pkl'.format(path), 'ab')
+    pickle.dump(data_feature_outputs, dbfile)
+    dbfile.close()
+    return data_attribute_outputs, real_attribute_mask
 
+
+def add_gen_flag_split(path, nr_samples, data_gen_flag, data_feature_outputs,
+                       sample_len):
+    if not os.path.exists("{}/gen_flag".format(path)):
+        os.makedirs("{}/gen_flag".format(path))
+    for output in data_feature_outputs:
+        if output.is_gen_flag:
+            raise Exception("is_gen_flag should be False for all"
+                            "feature_outputs")
+
+    if len(data_gen_flag.shape) != 2:
+        raise Exception("data_gen_flag should be 2 dimension")
+
+    num_sample, length = data_gen_flag.shape
+
+    data_gen_flag = np.expand_dims(data_gen_flag, 2)
+
+    data_feature_outputs.append(Output(
+        type_=OutputType.DISCRETE,
+        dim=2,
+        is_gen_flag=True))
+
+    shift_gen_flag = np.concatenate(
+        [data_gen_flag[:, 1:, :],
+         np.zeros((data_gen_flag.shape[0], 1, 1))],
+        axis=1)
+    if length % sample_len != 0:
+        raise Exception("length must be a multiple of sample_len")
+    data_gen_flag_t = np.reshape(
+        data_gen_flag,
+        [num_sample, int(length / sample_len), sample_len])
+    data_gen_flag_t = np.sum(data_gen_flag_t, 2)
+    data_gen_flag_t = data_gen_flag_t > 0.5
+    data_gen_flag_t = np.repeat(data_gen_flag_t, sample_len, axis=1)
+    data_gen_flag_t = np.expand_dims(data_gen_flag_t, 2)
+
+    for u in range(nr_samples):
+        features = np.load("{}/{}_data_feature.npy".format(path, u))
+        features = np.concatenate(
+            [features, shift_gen_flag[u], (1 - shift_gen_flag[u]) * data_gen_flag_t[u]],
+            axis=1)
+        np.save("{}/gen_flag/{}_data_feature.npy".format(path, u), features)
+    dbfile = open('{}/gen_flag/data_feature_output.pkl'.format(path), 'ab')
+    pickle.dump(data_feature_outputs, dbfile)
+    dbfile.close()
+    return data_feature_outputs
 
 
 def add_gen_flag(data_feature, data_gen_flag, data_feature_outputs,
