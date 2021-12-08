@@ -1,7 +1,0 @@
-IMPORTANT NOTES - 
-MAX LEN PER SAMPLE IS LIMITED TO 50000
-MANY COLUMNS (ZIP, MERCHANT STATE ETC.) ARE MISSING DUE TO MEMORY ALLOCATION PROBLEMSAttribute - Column 0: User
-Feature - Column 0: Amount
-Feature - Column 1: Timestamp
-Feature - Column 3: Use Chip
-Feature - Column 6: Card

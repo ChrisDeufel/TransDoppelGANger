@@ -116,8 +116,9 @@ class SplitData(Dataset):
 
         ################ WALKAROUND TO PROVIDE VARIABLES NECESSARY FOR ARCHITECTURES ################
         #TODO: find other way to provide variables
-        self.rand_data_feature = np.load("{}/0_data_feature.npy".format(self.data_path))
-        self.rand_data_attribute = np.load("{}/0_data_attribute.npy".format(self.data_path))
+        if self.normalize and self.gen_flag:
+            self.rand_data_feature = np.load("{}/gen_flag/0_data_feature.npy".format(self.data_path))
+            self.rand_data_attribute = np.load("{}/0_data_attribute.npy".format(self.data_path))
         self.data_feature_shape = (self.nr_samples, self.rand_data_feature.shape[0], self.rand_data_feature.shape[1])
         self.data_attribute_shape = (self.nr_samples, self.rand_data_attribute.shape[0])
 

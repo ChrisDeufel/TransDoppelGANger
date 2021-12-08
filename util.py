@@ -198,13 +198,19 @@ def normalize_per_sample_split(path, nr_samples, data_feature_outputs, data_attr
     # assume all samples have maximum length
     additional_attribute_outputs = []
 
+    counter = 0
     dim = 0
     for output in data_feature_outputs:
         if output.type_ == OutputType.CONTINUOUS:
             for _ in range(output.dim):
                 for u in range(nr_samples):
-                    attributes = np.load("{}/{}_data_attribute.npy".format(path, u))
-                    features = np.load("{}/{}_data_feature.npy".format(path, u))
+                    if counter < nr_samples:
+                        attributes = np.load("{}/{}_data_attribute.npy".format(path, u))
+                        features = np.load("{}/{}_data_feature.npy".format(path, u))
+                        counter += 1
+                    else:
+                        attributes = np.load("{}/normalized/{}_data_attribute.npy".format(path, u))
+                        features = np.load("{}/normalized/{}_data_feature.npy".format(path, u))
                     max_ = np.expand_dims(np.array(np.amax(features, axis=0)[dim] + eps), axis=0)
                     min_ = np.expand_dims(np.array(np.amin(features, axis=0)[dim] - eps), axis=0)
                     attributes = np.concatenate((attributes, (max_ + min_) / 2.0), axis=0)

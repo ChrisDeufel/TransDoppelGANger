@@ -120,19 +120,21 @@ class Trainer:
             attributes, features = self.gen(real_attribute_noise,
                                             addi_attribute_noise,
                                             feature_input_noise)
+            attributes = attributes.numpy()
+            features = features.numpy()
             # attributes = torch.cat((attributes, addi_attributes), dim=1)
 
             # TODO: possible without loop?!
             gen_flags = np.zeros(features.shape[:-1])
             lengths = np.zeros(features.shape[0])
             for i in range(len(features)):
-                sample_gen = features[i, :, -1]
-                argmax = np.argmax(sample_gen.cpu())
+                winner = (features[i, :, -1] > features[i, :, -2])
+                argmax = np.argmax(winner==True)
                 gen_flags[i, :argmax] = 1
                 lengths[i] = argmax
             if not return_gen_flag_feature:
                 features = features[:, :, :-2]
-        return features.cpu().numpy(), attributes.cpu().numpy(), gen_flags, lengths
+        return features, attributes, gen_flags, lengths
 
     def calculate_gp_dis(self, batch_size, fake_feature, data_feature, fake_attribute, data_attribute):
         alpha_dim2 = torch.FloatTensor(batch_size, 1).uniform_(1).to(self.device)

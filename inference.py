@@ -7,8 +7,8 @@ from gan.network import Discriminator, AttrDiscriminator, DoppelGANgerGeneratorR
 from load_data import load_data
 from util import normalize_per_sample, add_gen_flag
 
-device = "cuda" if torch.cuda.is_available() else "cpu"
-# device = 'cpu'
+#device = "cuda" if torch.cuda.is_available() else "cpu"
+device = 'cpu'
 sample_len = 4
 batch_size = 10
 
@@ -37,8 +37,8 @@ data_feature, data_feature_outputs = add_gen_flag(data_feature, data_gen_flag, d
 noise_dim = 5
 
 # generate discriminators and generator
-discriminator = Discriminator(data_feature, data_attribute)
-attr_discriminator = AttrDiscriminator(data_attribute)
+discriminator = Discriminator(data_feature.shape, data_attribute.shape)
+attr_discriminator = AttrDiscriminator(data_attribute.shape)
 # generator = DoppelGANgerGeneratorAttention(noise_dim=noise_dim, feature_outputs=data_feature_outputs,
 #                                            attribute_outputs=data_attribute_outputs,
 #                                            real_attribute_mask=real_attribute_mask, device=device,

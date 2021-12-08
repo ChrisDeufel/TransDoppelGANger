@@ -7,10 +7,11 @@ from trainer import Trainer, add_handler_trainer
 from gan.network import Discriminator, AttrDiscriminator, DoppelGANgerGeneratorAttention, DoppelGANgerGeneratorRNN
 from util import add_gen_flag, normalize_per_sample
 import os
+import numpy as np
 
-device = "cuda" if torch.cuda.is_available() else "cpu"
-# device = 'cpu'
-dataset = "transactions"
+#device = "cuda" if torch.cuda.is_available() else "cpu"
+device = "cpu"
+dataset = "FCC_MBA"
 checkpoint_dir = 'runs/{0}/test/1/checkpoint'.format(dataset)
 if not os.path.exists(checkpoint_dir):
     os.makedirs(checkpoint_dir)
@@ -36,11 +37,11 @@ config_handler.setFormatter(config_formatter)
 logger.addHandler(config_handler)
 
 sample_len = 4
-batch_size = 10
+batch_size = 100
 attn_dim = 100
 # load data
-#dataset = Data(sample_len=sample_len, name=dataset)
-dataset = SplitData(sample_len, name=dataset)
+dataset = Data(sample_len=sample_len, name=dataset)
+#dataset = SplitData(sample_len, name=dataset)
 real_train_dl = DataLoader(dataset=dataset, batch_size=batch_size, shuffle=True)
 
 #noise_dim = attn_dim - dataset.data_attribute.shape[1]
@@ -66,6 +67,9 @@ generator = DoppelGANgerGeneratorRNN(noise_dim=noise_dim, feature_outputs=datase
                                      attribute_outputs=dataset.data_attribute_outputs,
                                      real_attribute_mask=dataset.real_attribute_mask, device=device,
                                      sample_len=sample_len)
+model_parameters = filter(lambda p: p.requires_grad, generator.parameters())
+params = sum([np.prod(p.size()) for p in model_parameters])
+print(params)
 
 logger.info("GENERATOR: {0}".format(generator))
 # define optimizer
