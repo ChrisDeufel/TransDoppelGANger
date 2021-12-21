@@ -23,13 +23,17 @@ class Data(Dataset):
         if normalize:
             (self.data_feature, self.data_attribute, self.data_attribute_outputs,
              self.real_attribute_mask) = normalize_per_sample(self.data_feature, self.data_attribute,
-                                                              self.data_feature_outputs, self.data_attribute_outputs)
+                                                              self.data_feature_outputs, self.data_attribute_outputs,
+                                                              self.data_gen_flag)
 
         if gen_flag:
             self.data_feature, self.data_feature_outputs = add_gen_flag(self.data_feature, self.data_gen_flag,
                                                                         self.data_feature_outputs, sample_len)
         self.data_feature_shape = self.data_feature.shape
         self.data_attribute_shape = self.data_attribute.shape
+        np.save("data/{}/data_feature_n_g.npy".format(name), self.data_feature)
+        np.save("data/{}/data_attribute_n_g.npy".format(name), self.data_attribute)
+
 
     def __getitem__(self, idx):
         attribute = torch.Tensor(self.data_attribute[idx, :])
@@ -115,13 +119,12 @@ class SplitData(Dataset):
                     self.data_feature_outputs = pickle.load(f)
 
         ################ WALKAROUND TO PROVIDE VARIABLES NECESSARY FOR ARCHITECTURES ################
-        #TODO: find other way to provide variables
+        # TODO: find other way to provide variables
         if self.normalize and self.gen_flag:
             self.rand_data_feature = np.load("{}/gen_flag/0_data_feature.npy".format(self.data_path))
             self.rand_data_attribute = np.load("{}/0_data_attribute.npy".format(self.data_path))
         self.data_feature_shape = (self.nr_samples, self.rand_data_feature.shape[0], self.rand_data_feature.shape[1])
         self.data_attribute_shape = (self.nr_samples, self.rand_data_attribute.shape[0])
-
 
     def __getitem__(self, idx):
         if self.normalize and self.gen_flag:

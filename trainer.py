@@ -110,6 +110,12 @@ class Trainer:
         self.dis = torch.load("{0}/discriminator.pth".format(model_dir))
         self.attr_dis = torch.load("{0}/attr_discriminator.pth".format(model_dir))
         self.gen = torch.load("{0}/generator.pth".format(model_dir))
+        self.dis = self.dis.to(self.device)
+        self.attr_dis = self.attr_dis.to(self.device)
+        self.gen = self.gen.to(self.device)
+        self.dis.device = self.device
+        self.attr_dis.device = self.device
+        self.gen.device = self.device
 
     def sample_from(self, real_attribute_noise, addi_attribute_noise, feature_input_noise,
                     return_gen_flag_feature=False):
@@ -120,8 +126,8 @@ class Trainer:
             attributes, features = self.gen(real_attribute_noise,
                                             addi_attribute_noise,
                                             feature_input_noise)
-            attributes = attributes.numpy()
-            features = features.numpy()
+            attributes = attributes.cpu().numpy()
+            features = features.cpu().numpy()
             # attributes = torch.cat((attributes, addi_attributes), dim=1)
 
             # TODO: possible without loop?!
@@ -129,8 +135,11 @@ class Trainer:
             lengths = np.zeros(features.shape[0])
             for i in range(len(features)):
                 winner = (features[i, :, -1] > features[i, :, -2])
-                argmax = np.argmax(winner==True)
-                gen_flags[i, :argmax] = 1
+                argmax = np.argmax(winner == True)
+                if argmax == 0:
+                    gen_flags[i, :] = 1
+                else:
+                    gen_flags[i, :argmax] = 1
                 lengths[i] = argmax
             if not return_gen_flag_feature:
                 features = features[:, :, :-2]

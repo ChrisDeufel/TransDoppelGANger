@@ -6,73 +6,71 @@ from gan.network import Discriminator, AttrDiscriminator, DoppelGANgerGeneratorR
 # from gan.network import Discriminator, AttrDiscriminator, DoppelGANgerGenerator
 from load_data import load_data
 from util import normalize_per_sample, add_gen_flag
+from data import Data, LargeData, SplitData
 
-#device = "cuda" if torch.cuda.is_available() else "cpu"
-device = 'cpu'
-sample_len = 4
-batch_size = 10
+device = "cuda" if torch.cuda.is_available() else "cpu"
+dataset_name = "index_growth_12mo"
+gan_type = 'RNN'
 
-# noise_dim = 5
-# load data
-dataset = 'FCC_MBA'
+sample_len = 12
+batch_size = 20
 attn_dim = 100
 # load data
-# dataset = Data(sample_len=sample_len, name=dataset)
-# real_train_dl = DataLoader(dataset=dataset, batch_size=batch_size, shuffle=True)
+if dataset_name == "transactions":
+    dataset = SplitData(sample_len, name=dataset_name)
+else:
+    dataset = Data(sample_len=sample_len, name=dataset_name)
+real_train_dl = DataLoader(dataset=dataset, batch_size=batch_size, shuffle=True)
 
+if gan_type == 'RNN':
+    noise_dim = 5
+else:
+    noise_dim = attn_dim - dataset.data_attribute.shape[1]
 
 attn_mask = True
 num_heads = 10
-(data_feature, data_attribute,
- data_gen_flag,
- data_feature_outputs, data_attribute_outputs) = load_data("data/{0}".format(dataset))
-
-(data_feature, data_attribute,
- data_attribute_outputs, real_attribute_mask) = normalize_per_sample(data_feature, data_attribute,
-                                                                     data_feature_outputs, data_attribute_outputs)
-
-data_feature, data_feature_outputs = add_gen_flag(data_feature, data_gen_flag, data_feature_outputs, sample_len)
-
-# noise_dim = attn_dim - data_attribute.shape[1]
-noise_dim = 5
 
 # generate discriminators and generator
-discriminator = Discriminator(data_feature.shape, data_attribute.shape)
-attr_discriminator = AttrDiscriminator(data_attribute.shape)
-# generator = DoppelGANgerGeneratorAttention(noise_dim=noise_dim, feature_outputs=data_feature_outputs,
-#                                            attribute_outputs=data_attribute_outputs,
-#                                            real_attribute_mask=real_attribute_mask, device=device,
-#                                            sample_len=sample_len, num_heads=num_heads, attn_dim=attn_dim)
-generator = DoppelGANgerGeneratorRNN(noise_dim=noise_dim, feature_outputs=data_feature_outputs,
-                                     attribute_outputs=data_attribute_outputs,
-                                     real_attribute_mask=real_attribute_mask, device=device, sample_len=sample_len)
+discriminator = Discriminator(dataset.data_feature_shape, dataset.data_attribute_shape)
+attr_discriminator = AttrDiscriminator(dataset.data_attribute_shape)
+
+
+if gan_type == "RNN":
+    generator = DoppelGANgerGeneratorRNN(noise_dim=noise_dim, feature_outputs=dataset.data_feature_outputs,
+                                         attribute_outputs=dataset.data_attribute_outputs,
+                                         real_attribute_mask=dataset.real_attribute_mask, device=device,
+                                         sample_len=sample_len)
+else:
+    generator = DoppelGANgerGeneratorAttention(noise_dim=noise_dim, feature_outputs=dataset.data_feature_outputs,
+                                               attribute_outputs=dataset.data_attribute_outputs,
+                                               real_attribute_mask=dataset.real_attribute_mask, device=device,
+                                               sample_len=sample_len, num_heads=num_heads, attn_dim=attn_dim)
 
 # define optimizer
-g_lr = 0.001
+g_lr = 0.0001
 g_beta1 = 0.5
-d_lr = 0.001
+d_lr = 0.0001
 d_beta1 = 0.5
-attr_d_lr = 0.001
+attr_d_lr = 0.0001
 attr_d_beta1 = 0.5
-attr_opt = torch.optim.Adam(discriminator.parameters(), lr=d_lr, betas=(d_beta1, d_beta1))
-d_attr_opt = torch.optim.Adam(attr_discriminator.parameters(), lr=attr_d_lr, betas=(attr_d_beta1, attr_d_beta1))
-gen_opt = torch.optim.Adam(generator.parameters(), lr=g_lr, betas=(g_beta1, g_beta1))
-data_feature_shape = data_feature.shape
+
+attr_opt = torch.optim.Adam(discriminator.parameters(), lr=d_lr, betas=(0.5, 0.999))
+d_attr_opt = torch.optim.Adam(attr_discriminator.parameters(), lr=attr_d_lr, betas=(0.5, 0.999))
+gen_opt = torch.optim.Adam(generator.parameters(), lr=g_lr, betas=(0.5, 0.999))
+
+data_feature_shape = dataset.data_feature_shape
 # define Hyperparameters
 epoch = 400
-vis_freq = 500
-vis_num_sample = 5
 d_rounds = 1
 g_rounds = 1
 d_gp_coe = 10.0
 attr_d_gp_coe = 10.0
 g_attr_d_coe = 1.0
-extra_checkpoint_freq = 5
-num_packing = 1
+
 
 for n in range(1, 2, 1):
-    for i in range(0, 500, 20):
-        model_dir = "runs/FCC_MBA/test/{}/checkpoint/epoch_{}".format(n, i)
+    for i in range(0, 400, 20):
+        model_dir = "runs/{}/{}/{}/checkpoint/epoch_{}".format(dataset_name, gan_type, n, i)
         trainer = Trainer(discriminator=discriminator, attr_discriminator=attr_discriminator, generator=generator,
                           criterion=None, dis_optimizer=attr_opt, addi_dis_optimizer=d_attr_opt, gen_optimizer=gen_opt,
                           real_train_dl=None, data_feature_shape=data_feature_shape, device=device,
@@ -82,10 +80,10 @@ for n in range(1, 2, 1):
 
         # start sampling
         # for the start we want to 'produce' as many samples as we have data available
-        rounds = data_attribute.shape[0] // batch_size
-        sampled_features = np.zeros((0, data_feature.shape[1], data_feature.shape[2] - 2))
-        sampled_attributes = np.zeros((0, data_attribute.shape[1]))
-        sampled_gen_flags = np.zeros((0, data_feature.shape[1]))
+        rounds = dataset.data_attribute_shape[0] // batch_size
+        sampled_features = np.zeros((0, dataset.data_feature_shape[1], dataset.data_feature_shape[2] - 2))
+        sampled_attributes = np.zeros((0, dataset.data_attribute_shape[1]))
+        sampled_gen_flags = np.zeros((0, dataset.data_feature_shape[1]))
         sampled_lengths = np.zeros(0)
         for i in range(rounds):
             real_attribute_input_noise = trainer.gen_attribute_input_noise(batch_size).to(device)

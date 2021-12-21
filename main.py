@@ -9,14 +9,14 @@ from util import add_gen_flag, normalize_per_sample
 import os
 import numpy as np
 
-#device = "cuda" if torch.cuda.is_available() else "cpu"
-device = "cpu"
-dataset = "FCC_MBA"
-checkpoint_dir = 'runs/{0}/test/1/checkpoint'.format(dataset)
+device = "cuda" if torch.cuda.is_available() else "cpu"
+dataset = "index_growth_3mo"
+gan_type = 'RNN'
+checkpoint_dir = 'runs/{}/{}/2/checkpoint'.format(dataset, gan_type)
 if not os.path.exists(checkpoint_dir):
     os.makedirs(checkpoint_dir)
-time_logging_file = 'runs/{0}/test/1/time.log'.format(dataset)
-config_logging_file = 'runs/{0}/test/1/config.log'.format(dataset)
+time_logging_file = 'runs/{}/{}/2/time.log'.format(dataset, gan_type)
+config_logging_file = 'runs/{}/{}/2/config.log'.format(dataset, gan_type)
 # SET UP LOGGING
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
@@ -36,16 +36,21 @@ config_handler.setLevel(logging.INFO)
 config_handler.setFormatter(config_formatter)
 logger.addHandler(config_handler)
 
-sample_len = 4
-batch_size = 100
+sample_len = 1
+batch_size = 20
 attn_dim = 100
 # load data
-dataset = Data(sample_len=sample_len, name=dataset)
-#dataset = SplitData(sample_len, name=dataset)
+if dataset == "transactions":
+    dataset = SplitData(sample_len, name=dataset)
+else:
+    dataset = Data(sample_len=sample_len, name=dataset)
 real_train_dl = DataLoader(dataset=dataset, batch_size=batch_size, shuffle=True)
 
-#noise_dim = attn_dim - dataset.data_attribute.shape[1]
-noise_dim = 5
+if gan_type == 'RNN':
+    noise_dim = 5
+else:
+    noise_dim = attn_dim - dataset.data_attribute.shape[1]
+
 attn_mask = True
 num_heads = 10
 logger.info("Sample Length: {0}".format(sample_len))
@@ -59,27 +64,28 @@ discriminator = Discriminator(dataset.data_feature_shape, dataset.data_attribute
 logger.info("DISCRIMINATOR: {0}".format(discriminator))
 attr_discriminator = AttrDiscriminator(dataset.data_attribute_shape)
 logger.info("ATTRIBUTE DISCRIMINATOR: {0}".format(attr_discriminator))
-# generator = DoppelGANgerGeneratorAttention(noise_dim=noise_dim, feature_outputs=dataset.data_feature_outputs,
-#                                            attribute_outputs=dataset.data_attribute_outputs,
-#                                            real_attribute_mask=dataset.real_attribute_mask, device=device,
-#                                            sample_len=sample_len, num_heads=num_heads, attn_dim=attn_dim)
-generator = DoppelGANgerGeneratorRNN(noise_dim=noise_dim, feature_outputs=dataset.data_feature_outputs,
-                                     attribute_outputs=dataset.data_attribute_outputs,
-                                     real_attribute_mask=dataset.real_attribute_mask, device=device,
-                                     sample_len=sample_len)
-model_parameters = filter(lambda p: p.requires_grad, generator.parameters())
-params = sum([np.prod(p.size()) for p in model_parameters])
-print(params)
+
+if gan_type == "RNN":
+    generator = DoppelGANgerGeneratorRNN(noise_dim=noise_dim, feature_outputs=dataset.data_feature_outputs,
+                                         attribute_outputs=dataset.data_attribute_outputs,
+                                         real_attribute_mask=dataset.real_attribute_mask, device=device,
+                                         sample_len=sample_len)
+else:
+    generator = DoppelGANgerGeneratorAttention(noise_dim=noise_dim, feature_outputs=dataset.data_feature_outputs,
+                                               attribute_outputs=dataset.data_attribute_outputs,
+                                               real_attribute_mask=dataset.real_attribute_mask, device=device,
+                                               sample_len=sample_len, num_heads=num_heads, attn_dim=attn_dim)
+
 
 logger.info("GENERATOR: {0}".format(generator))
 # define optimizer
-g_lr = 0.001
+g_lr = 0.0001
 g_beta1 = 0.5
 logger.info("g_lr: {0} / g_beta1: {1}".format(g_lr, g_beta1))
-d_lr = 0.001
+d_lr = 0.0001
 d_beta1 = 0.5
 logger.info("d_lr: {0} / d_beta1: {1}".format(d_lr, d_beta1))
-attr_d_lr = 0.001
+attr_d_lr = 0.0001
 attr_d_beta1 = 0.5
 logger.info("attr_d_lr: {0} / attr_d_beta1: {1}".format(attr_d_lr, attr_d_beta1))
 
@@ -89,7 +95,7 @@ gen_opt = torch.optim.Adam(generator.parameters(), lr=g_lr, betas=(0.5, 0.999))
 
 data_feature_shape = dataset.data_feature_shape
 # define Hyperparameters
-epoch = 500
+epoch = 400
 d_rounds = 1
 logger.info("d_rounds: {0}".format(d_rounds))
 g_rounds = 1

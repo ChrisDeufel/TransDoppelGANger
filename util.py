@@ -138,10 +138,16 @@ def renormalize_per_sample(data_feature, data_attribute, data_feature_outputs,
 
 
 def normalize_per_sample(data_feature, data_attribute, data_feature_outputs,
-                         data_attribute_outputs, eps=1e-4):
+                         data_attribute_outputs, data_gen_flag, eps=0.000001):
     # assume all samples have maximum length
-    data_feature_min = np.amin(data_feature, axis=1)
-    data_feature_max = np.amax(data_feature, axis=1)
+    data_feature_min = np.zeros((data_feature.shape[0], data_feature.shape[2]))
+    data_feature_max = np.zeros((data_feature.shape[0], data_feature.shape[2]))
+    for i in range(len(data_feature)):
+        len_feature = np.count_nonzero(data_gen_flag[i, :])
+        data_feature_min[i, :] = np.amin(data_feature[i, :len_feature, :], axis=0)
+        data_feature_max[i, :] = np.amax(data_feature[i, :len_feature, :], axis=0)
+    #data_feature_min = np.amin(data_feature, axis=1)
+    #data_feature_max = np.amax(data_feature, axis=1)
 
     additional_attribute = []
     additional_attribute_outputs = []
@@ -186,6 +192,10 @@ def normalize_per_sample(data_feature, data_attribute, data_feature_outputs,
     data_attribute = np.concatenate(
         [data_attribute, additional_attribute], axis=1)
     data_attribute_outputs.extend(additional_attribute_outputs)
+
+    for i in range(len(data_feature)):
+        len_feature = np.count_nonzero(data_gen_flag[i, :])
+        data_feature[i, len_feature:, :] = 0
 
     return data_feature, data_attribute, data_attribute_outputs, \
            real_attribute_mask
