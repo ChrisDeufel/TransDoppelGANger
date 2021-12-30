@@ -9,10 +9,10 @@ from util import normalize_per_sample, add_gen_flag
 from data import Data, LargeData, SplitData
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
-dataset_name = "index_growth_12mo"
+dataset_name = "index_growth_1mo"
 gan_type = 'RNN'
 
-sample_len = 12
+sample_len = 1
 batch_size = 20
 attn_dim = 100
 # load data
@@ -80,6 +80,8 @@ for n in range(1, 2, 1):
 
         # start sampling
         # for the start we want to 'produce' as many samples as we have data available
+        while dataset.data_attribute_shape[0] % batch_size != 0:
+            batch_size -= 1
         rounds = dataset.data_attribute_shape[0] // batch_size
         sampled_features = np.zeros((0, dataset.data_feature_shape[1], dataset.data_feature_shape[2] - 2))
         sampled_attributes = np.zeros((0, dataset.data_attribute_shape[1]))

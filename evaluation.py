@@ -72,9 +72,15 @@ def qq_plot(dir, data, data_feature_output, metric='mean'):
 ### TSNE/ PCA Embedding ###
 def plot_embedding(data, file, embedding):
     fig, axes = plt.subplots(1, 1, figsize=(12, 4))
-    for set in data:
+    counter = 0
+    for set in reversed(data):
+        if counter == 0:
+            alpha = 1
+        else:
+            alpha = 0.3
         axes.scatter(set["embedded_features"][:, 0], set["embedded_features"][:, 1], color=set["color"],
-                     label=set["name"])
+                     label=set["name"], alpha=alpha)
+        counter += 1
     axes.legend()
     axes.set_title(embedding)
     plt.savefig("{0}.png".format(file))
@@ -122,7 +128,6 @@ def emd(dir, data, data_feature_output):
     dir = "{0}/{1}".format(eval_dir, "emd")
     if not os.path.exists(dir):
         os.makedirs(dir)
-    # dir = "{0}/{1}".format(dir, epoch)
     feature_dim = 0
     for f in data_feature_output:
         if f.type_ == output.OutputType.DISCRETE:
@@ -135,12 +140,13 @@ def emd(dir, data, data_feature_output):
             feature_mean = np.mean(data_feature, axis=0)
             data_to_plot.append({"feature_mean": feature_mean, "name": set['name'], "color": set['color']})
         emd = stats.wasserstein_distance(data_to_plot[0]['feature_mean'], data_to_plot[1]['feature_mean'])
-        print(emd)
         file = "{0}/feature_{1}".format(dir, feature_dim)
         if not os.path.exists(file):
             os.makedirs(file)
-        file = "{0}/{1}".format(file, epoch)
-        # plot_auto(data=data_to_plot, file=file)
+        file = "{0}/emds".format(file, epoch)
+        writer_file = open("{}.txt".format(file), "a")
+        writer_file.write("{}: {}\n".format(epoch, emd))
+        writer_file.close()
         feature_dim += f.dim
 
 
@@ -156,12 +162,14 @@ def autocorr(x, nlags):
 def plot_auto(data, file, partial):
     fig, axes = plt.subplots(1, 1, figsize=(12, 4))
     for set in data:
-        axes.plot(set["auto_data"][1:], color=set["color"], label=set["name"])
+        axes.plot(np.arange(1, len(set["auto_data"])), set["auto_data"][1:], color=set["color"], label=set["name"])
     axes.legend()
     if partial:
         axes.set_title("Partial-Autocorrelation")
     else:
         axes.set_title("Autocorrelation")
+    # plt.xlim(1, len(data[0]["auto_data"]-2))
+    plt.subplots_adjust(left=0.1, bottom=0.1, right=0.9, top=0.9)
     plt.savefig("{0}.png".format(file))
 
 
@@ -213,7 +221,7 @@ def autocorrelation(dir, data, data_feature_output, n_lags, partial=False):
                 else:
                     auto = np.concatenate((auto, np.expand_dims(autocorr(data_feature[i, :len_seq], n_lags), axis=0)),
                                           axis=0)
-            # auto = auto[~np.isnan(auto).any(axis=1), :]
+            auto = auto[~np.isnan(auto).any(axis=1), :]
             data_avg_auto = np.mean(auto, axis=0)
             data_to_plot.append({"auto_data": data_avg_auto, "name": set['name'], "color": set['color']})
         file = "{0}/feature_{1}".format(dir, feature_dim)
@@ -265,12 +273,15 @@ def pearson(x, y):
 
 
 # calculate and plot cdf from list
-def plot_cdf(data, file):
+def plot_cdf(data, file, normalization):
     fig, axes = plt.subplots(1, 1, figsize=(12, 8))
     for set in data:
         pdf = set['pdf']
         Y = np.cumsum(pdf)
-        X = np.arange(pdf.shape[0])
+        if normalization == output.Normalization.MINUSONE_ONE:
+            X = np.linspace(-1, 1, pdf.shape[0])
+        else:
+            X = np.linspace(0, 1, pdf.shape[0])
         axes.plot(X, Y, color=set['color'], label=set['name'])
     axes.legend()
     axes.set_title("CDF")
@@ -565,9 +576,9 @@ def meta_meas_corr(dir, data, data_attribute_outputs, data_feature_outputs, plot
                             os.makedirs(file)
                         file = "{0}/{1}".format(file, epoch)
                         plot_cdf(data=data_to_plot,
-                                 file=file)
+                                 file=file, normalization=feature.normalization)
                     d.append(wasserstein_distance(pdf_real, pdf_fake) - 1)
-                    columns.append('attribute{1}_dim{2}_feature{3}'.format(dataset, a, i, f))
+                    columns.append('attribute{}_dim{}_feature{}'.format(a, i, f))
             feature_dim += feature.dim
     if w_distance:
         m = statistics.mean(d)
@@ -677,7 +688,7 @@ def mse_autocorrelation(dir, real_data_features, sample_data_features, data_feat
 
 
 # load web dataset for testing
-dataset_name = 'FCC_MBA'
+dataset_name = 'index_growth_1mo'
 gan_type = 'RNN'
 # load original data
 (data_feature, data_attribute, data_gen_flag, data_feature_outputs, data_attribute_outputs) = \
@@ -728,14 +739,14 @@ for i in range(1, 2):
         # sequence_length(dir=evaluation_dir, data=data)
         # cross_measurement(dir=evaluation_dir, data=data, nr_bins=100)
         # measurement_distribution(dir=evaluation_dir, data=data, feature_output=data_feature_outputs)
-        # emd(dir=evaluation_dir, data=data, data_feature_output=data_feature_outputs)
-        # autocorrelation(dir=evaluation_dir, data=data, data_feature_output=data_feature_outputs, n_lags=40,
-        #                 partial=True)
+        emd(dir=evaluation_dir, data=data, data_feature_output=data_feature_outputs)
+        # autocorrelation(dir=evaluation_dir, data=data, data_feature_output=data_feature_outputs, n_lags=15,
+        #                 partial=False)
         # nearest_neighbors(dir=evaluation_dir, real_data_features=data_feature, sampled_data_features=sampled_features,
-        #                  data_feature_outputs=data_feature_outputs)
+        #                   data_feature_outputs=data_feature_outputs)
         # meta_meas_corr(dir=evaluation_dir, data=data, data_attribute_outputs=data_attribute_outputs,
         #                data_feature_outputs=data_feature_outputs)
         # mse_autocorrelation(dir=evaluation_dir, real_data_features=data_feature, sample_data_features=sampled_features,
         #                    data_feature_outputs=data_feature_outputs)
         # embedding(dir=evaluation_dir, data=data, data_feature_output=data_feature_outputs, embedding='PCA')
-        # qq_plot(dir=evaluation_dir, data=data, data_feature_output=data_feature_outputs, metric='kurtosis')
+        # qq_plot(dir=evaluation_dir, data=data, data_feature_output=data_feature_outputs, metric='skewness')

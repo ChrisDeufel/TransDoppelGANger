@@ -10,13 +10,14 @@ import os
 import numpy as np
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
-dataset = "index_growth_3mo"
+#device = "cpu"
+dataset = "index_growth_1mo"
 gan_type = 'RNN'
-checkpoint_dir = 'runs/{}/{}/2/checkpoint'.format(dataset, gan_type)
+checkpoint_dir = 'runs/{}/{}/test/checkpoint'.format(dataset, gan_type)
 if not os.path.exists(checkpoint_dir):
     os.makedirs(checkpoint_dir)
-time_logging_file = 'runs/{}/{}/2/time.log'.format(dataset, gan_type)
-config_logging_file = 'runs/{}/{}/2/config.log'.format(dataset, gan_type)
+time_logging_file = 'runs/{}/{}/test/time.log'.format(dataset, gan_type)
+config_logging_file = 'runs/{}/{}/test/config.log'.format(dataset, gan_type)
 # SET UP LOGGING
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
@@ -111,5 +112,5 @@ trainer = Trainer(discriminator=discriminator, attr_discriminator=attr_discrimin
                   criterion=None, dis_optimizer=attr_opt, addi_dis_optimizer=d_attr_opt, gen_optimizer=gen_opt,
                   real_train_dl=real_train_dl, data_feature_shape=data_feature_shape, device=device,
                   checkpoint_dir=checkpoint_dir, noise_dim=noise_dim,
-                  logging_file=time_logging_file, sample_len=sample_len, d_rounds=d_rounds, g_rounds=g_rounds)
+                  sample_len=sample_len, d_rounds=d_rounds, g_rounds=g_rounds)
 trainer.train(epochs=epoch, writer_frequency=1, saver_frequency=20)

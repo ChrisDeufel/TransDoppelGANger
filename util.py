@@ -138,7 +138,7 @@ def renormalize_per_sample(data_feature, data_attribute, data_feature_outputs,
 
 
 def normalize_per_sample(data_feature, data_attribute, data_feature_outputs,
-                         data_attribute_outputs, data_gen_flag, eps=0.000001):
+                         data_attribute_outputs, data_gen_flag, eps=0.001):
     # assume all samples have maximum length
     data_feature_min = np.zeros((data_feature.shape[0], data_feature.shape[2]))
     data_feature_max = np.zeros((data_feature.shape[0], data_feature.shape[2]))
@@ -352,3 +352,64 @@ def add_gen_flag(data_feature, data_gen_flag, data_feature_outputs,
         axis=2)
 
     return data_feature, data_feature_outputs
+
+
+def extract_len(data_gen_flag):
+    """Returns Maximum sequence length and each sequence length.
+
+    Args:
+      - data: original data
+
+    Returns:
+      - time: extracted time information
+      - max_seq_len: maximum sequence length
+    """
+    time = list()
+    max_seq_len = data_gen_flag.shape[1]
+    for i in range(len(data_gen_flag)):
+        seq_len = np.count_nonzero(data_gen_flag[i, :])
+        time.append(seq_len)
+
+    return np.asarray(time), max_seq_len
+
+
+def NormMinMax(data):
+    """Min-Max Normalizer.
+
+    Args:
+      - data: raw data
+
+    Returns:
+      - norm_data: normalized data
+      - min_val: minimum values (for renormalization)
+      - max_val: maximum values (for renormalization)
+    """
+    min_val = np.min(np.min(data, axis=0), axis=0)
+    data = data - min_val  # [3661, 24, 6]
+
+    max_val = np.max(np.max(data, axis=0), axis=0)
+    norm_data = data / (max_val + 1e-7)
+
+    return norm_data, min_val, max_val
+
+
+def random_generator(batch_size, z_dim, T_mb, max_seq_len):
+    """Random vector generation.
+
+    Args:
+      - batch_size: size of the random vector
+      - z_dim: dimension of random vector
+      - T_mb: time information for the random vector
+      - max_seq_len: maximum sequence length
+
+    Returns:
+      - Z_mb: generated random vector
+    """
+    Z_mb = np.random.uniform(0, 1, (batch_size, max_seq_len, z_dim))
+    # Z_mb = list()
+    # for i in range(batch_size):
+    #     temp = np.zeros([max_seq_len, z_dim])
+    #     temp_Z = np.random.uniform(0., 1, [T_mb[i], z_dim])
+    #     temp[:T_mb[i], :] = temp_Z
+    #     Z_mb.append(temp_Z)
+    return Z_mb

@@ -1,7 +1,8 @@
 from torch.utils.data import Dataset
 import torch
 from load_data import load_data
-from util import add_gen_flag, add_gen_flag_split, normalize_per_sample, normalize_per_sample_split
+from util import add_gen_flag, add_gen_flag_split, normalize_per_sample, normalize_per_sample_split, extract_len, \
+    NormMinMax
 import numpy as np
 import os
 import pickle
@@ -33,7 +34,6 @@ class Data(Dataset):
         self.data_attribute_shape = self.data_attribute.shape
         np.save("data/{}/data_feature_n_g.npy".format(name), self.data_feature)
         np.save("data/{}/data_attribute_n_g.npy".format(name), self.data_attribute)
-
 
     def __getitem__(self, idx):
         attribute = torch.Tensor(self.data_attribute[idx, :])
@@ -134,3 +134,60 @@ class SplitData(Dataset):
 
     def __len__(self):
         return self.nr_samples
+
+
+class DCData(Dataset):
+    def __init__(self, real_feature, fake_feature):
+        self.features = np.concatenate((real_feature, fake_feature), axis=0)
+        # fake = 0
+        fake_labels = np.zeros(len(fake_feature))
+        # real = 1
+        real_labels = np.ones(len(real_feature))
+        self.labels = np.concatenate((real_labels, fake_labels))
+
+    def __getitem__(self, idx):
+        feature = self.features[idx, :, :]
+        label = self.labels[idx]
+        return torch.tensor(feature, dtype=torch.float32), torch.tensor(label, dtype=torch.float32)
+
+    def __len__(self):
+        return len(self.features)
+
+
+class TimeGanData(Dataset):
+    def __init__(self, transforms=None, normalize=False, gen_flag=False, size=None, name='web'):
+        (self.data_feature, self.data_attribute, self.data_gen_flag,
+         self.data_feature_outputs, self.data_attribute_outputs) = load_data("data/{0}".format(name))
+        self.transforms = transforms
+        self.ori_data, self.min_val, self.max_val = NormMinMax(self.data_feature)
+        self.lengths, self.max_seq_len = extract_len(self.data_gen_flag)
+        self.lengths = np.expand_dims(self.lengths, axis=1)
+        self.name = name
+        if size is not None:
+            x = np.arange(len(self.data_attribute))
+            rand = np.random.choice(x, size=size, replace=False)
+            self.data_feature = self.data_feature[rand, :, :]
+            self.data_attribute = self.data_attribute[rand, :]
+            self.data_gen_flag = self.data_gen_flag[rand, :]
+        if normalize:
+            (self.data_feature, self.data_attribute, self.data_attribute_outputs,
+             self.real_attribute_mask) = normalize_per_sample(self.data_feature, self.data_attribute,
+                                                              self.data_feature_outputs, self.data_attribute_outputs,
+                                                              self.data_gen_flag)
+
+        # if gen_flag:
+        #     self.data_feature, self.data_feature_outputs = add_gen_flag(self.data_feature, self.data_gen_flag,
+        #                                                                 self.data_feature_outputs, sample_len)
+        self.data_feature_shape = self.data_feature.shape
+        self.data_attribute_shape = self.data_attribute.shape
+
+    def __getitem__(self, idx):
+        length = torch.tensor(self.lengths[idx], dtype=torch.float32)
+        feature = torch.tensor(self.data_feature[idx, :, :], dtype=torch.float32)
+        if self.transforms:
+            length = self.transforms(length)
+            feature = self.transforms(feature)
+        return length, feature
+
+    def __len__(self):
+        return len(self.data_feature)

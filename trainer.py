@@ -28,7 +28,6 @@ class Trainer:
                  data_feature_shape,
                  device,
                  checkpoint_dir='runs/web_18/checkpoint',
-                 logging_file='runs/web_18/time.log',
                  noise_dim=5,
                  sample_len=10,
                  dis_lambda_gp=10,
@@ -65,7 +64,6 @@ class Trainer:
         self.attr_dis = self.attr_dis.to(self.device)
         self.gen = self.gen.to(self.device)
         self.EPS = 1e-8
-        # self.criterion = self.criterion.to(self.device)
 
     def gen_attribute_input_noise(self, num_sample):
         return torch.randn(size=[num_sample, self.noise_dim])

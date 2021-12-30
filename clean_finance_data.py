@@ -15,7 +15,7 @@ def calc_decade(year):
     else:
         return 2
 
-measurement = "growth"
+measurement = "price"
 
 ################# ATTRIBUTES #################
 data_attribute_outputs = []
@@ -37,10 +37,10 @@ data_feature_outputs.append(Output(type_=OutputType.CONTINUOUS, dim=1, normaliza
 start_year = 1990
 end_year = 2021
 months = ["01", "02", "03", "04", "05", "06", "07", "08", "09", "10", "11", "12"]
-m_intervall = 12
+m_intervall = 1
 
 
-max_seq_len = 23*m_intervall
+max_seq_len = 25*m_intervall
 attr_range = 0
 for attr in data_attribute_outputs:
     attr_range += attr.dim
@@ -125,7 +125,7 @@ for index in indices:
             if len(raw_data) < (max_seq_len/2):
                 continue
             raw_data['Open'] = raw_data['Open'].fillna(method='ffill')
-            raw_data['Growth'] = (raw_data['Close']-raw_data['Open'])/raw_data['Open']
+            raw_data['Growth'] = ((raw_data['Close']-raw_data['Open'])/raw_data['Open'])
             # add attributes
             # continent
             cont = np.zeros(len(continent))
