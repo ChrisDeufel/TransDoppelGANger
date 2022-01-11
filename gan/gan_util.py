@@ -1,5 +1,5 @@
 import torch.nn as nn
-
+import torch
 
 def init_weights(layer):
     if type(layer) == nn.Linear:
@@ -13,3 +13,6 @@ def init_weights(layer):
                 nn.init.xavier_uniform_(W)
             else:
                 nn.init.ones_(W)
+
+def gen_noise(size):
+    return torch.randn(size=size)

@@ -1,23 +1,17 @@
-import torch
 import torch.nn as nn
-import torch.nn.functional as F
-from output import OutputType, Normalization
 from gan.gan_util import init_weights
-import math
+import torch.nn.functional as F
+import torch
 
 """
 NOTE: As the exact model architecture is not specified in https://arxiv.org/abs/1706.02633, I did implement a regular 
-GAN and replaced the Generator and Discriminator with LSTMs (this is all the information the paper gives)
+GAN as in 
+https://github.com/aladdinpersson/Machine-Learning-Collection/blob/master/ML/Pytorch/GANs/1.%20SimpleGAN/fc_gan.py 
+and replaced the Generator and Discriminator with LSTMs (this is all the information the paper gives)
 """
-class RGANGenerator:
-    def __init__(self,
-                 sequence_length,
-                 output_size,
-                 hidden_size=None,
-                 noise_size=5,
-                 num_layers=1,
-                 rnn_nonlinearity='tanh',
-                 **kwargs):
+class RGANGenerator(nn.Module):
+    def __init__(self, sequence_length, output_size, hidden_size=None, noise_size=5, num_layers=1,
+                 rnn_nonlinearity='tanh', **kwargs):
         """Recursive GAN (Generator) implementation with RNN cells.
 
         Layers:
@@ -43,6 +37,7 @@ class RGANGenerator:
                 either 'tanh' or 'relu'. Only valid if rnn_type == 'rnn'.
         """
         # Defaults
+        super().__init__()
         noise_size = noise_size or output_size
         hidden_size = hidden_size or output_size
 
@@ -57,10 +52,11 @@ class RGANGenerator:
         # Build RNN layer
         self.rnn = nn.LSTM(input_size=noise_size,
                            hidden_size=hidden_size,
-                           num_layers=num_layers,
-                           nonlinearity=rnn_nonlinearity)
+                           num_layers=num_layers)
         self.linear = nn.Linear(hidden_size, output_size)
         # Initialize all weights.
+        self.rnn.apply(init_weights)
+        self.linear.apply(init_weights)
 
     def forward(self, z):
         y, _ = self.rnn(z)
@@ -68,14 +64,8 @@ class RGANGenerator:
         return y
 
 
-class RGANDiscriminator:
-    def __init__(self,
-                 sequence_length,
-                 input_size,
-                 hidden_size=None,
-                 num_layers=1,
-                 rnn_nonlinearity='tanh',
-                 **kwargs):
+class RGANDiscriminator(nn.Module):
+    def __init__(self, sequence_length, input_size, hidden_size=None, num_layers=1, rnn_nonlinearity='tanh', **kwargs):
         """Recursive GAN (Discriminator) implementation with RNN cells.
 
         Layers:
@@ -97,6 +87,7 @@ class RGANDiscriminator:
                 either 'tanh' or 'relu'. Only valid if rnn_type == 'rnn'.
         """
         # Set hidden_size to input_size if not specified
+        super().__init__()
         hidden_size = hidden_size or input_size
 
         self.input_size = input_size
@@ -107,15 +98,15 @@ class RGANDiscriminator:
         # Build RNN layer
         self.rnn = nn.LSTM(input_size=input_size,
                            hidden_size=hidden_size,
-                           num_layers=num_layers,
-                           nonlinearity=rnn_nonlinearity)
+                           num_layers=num_layers)
         self.linear = nn.Linear(hidden_size, 1)
 
         # Initialize all weights.
-        # nn.init.xavier_normal_(self.rnn)
-        nn.init.xavier_normal_(self.linear.weight)
+        self.rnn.apply(init_weights)
+        self.linear.apply(init_weights)
 
     def forward(self, x):
         y, _ = self.rnn(x)
         y = self.linear(y)
+        y = torch.sigmoid(y)
         return y

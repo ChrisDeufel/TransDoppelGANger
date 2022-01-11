@@ -9,6 +9,33 @@ from gan.modules import MultiHeadAttention
 
 
 # torch.utils.backcompat.broadcast_warning.enabled = True
+# Transformer Discriminator
+class TransformerDiscriminator(nn.Module):
+    def __init__(self, input_feature_shape, input_attribute_shape, num_layers=5, num_units=200,
+                 scope_name="transformer_discriminator", *args, **kwargs):
+        super(TransformerDiscriminator, self).__init__()
+        self.scope_name = scope_name
+        # only saved for adding to summary writer (see trainer.train)
+        self.input_feature_shape = input_feature_shape
+        self.input_attribute_shape = input_attribute_shape
+        self.input_size = input_feature_shape[1] * input_feature_shape[2] + input_attribute_shape[1]
+        self.decoder = torch.nn.TransformerDecoderLayer(d_model=attn_dim, nhead=num_heads, dim_feedforward=attn_dim,
+                                                        batch_first=True)
+        modules = [nn.Linear(self.input_size, num_units), nn.ReLU()]
+        for i in range(num_layers - 2):
+            modules.append(nn.Linear(num_units, num_units))
+            modules.append(nn.ReLU())
+        modules.append(nn.Linear(num_units, 1))
+        # https://discuss.pytorch.org/t/append-for-nn-sequential-or-directly-converting-nn-modulelist-to-nn-sequential/7104
+        self.disc = nn.Sequential(*modules)
+        # initialize weights
+        self.disc.apply(init_weights)
+
+    def forward(self, input_feature, input_attribute):
+        input_feature = torch.flatten(input_feature, start_dim=1, end_dim=2)
+        input_attribute = torch.flatten(input_attribute, start_dim=1, end_dim=1)
+        x = torch.cat((input_feature, input_attribute), dim=1)
+        return self.disc(x)
 
 
 # Discriminator

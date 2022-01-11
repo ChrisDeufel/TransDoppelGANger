@@ -6,7 +6,22 @@ import pickle
 
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
+import logging
 
+
+def add_handler(handlers, logger):
+    for handler in handlers:
+        logger.addHandler(handler)
+
+
+def setup_logger(name, log_file, formatter, level=logging.INFO):
+    """To setup as many loggers as you want"""
+    handler = logging.FileHandler(log_file)
+    handler.setFormatter(formatter)
+    logger = logging.getLogger(name)
+    logger.setLevel(level)
+    logger.addHandler(handler)
+    return logger
 
 def draw_attribute(data, outputs, path=None):
     if isinstance(data, list):

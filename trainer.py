@@ -5,6 +5,7 @@ from torch.utils.tensorboard import SummaryWriter
 import os
 import logging
 from loss_util import gradient_penalty
+from gan.network import AttrDiscriminator, Discriminator, DoppelGANgerGeneratorRNN, DoppelGANgerGeneratorAttention
 
 time_logger = logging.getLogger(__name__)
 time_logger.setLevel(logging.INFO)
@@ -17,13 +18,7 @@ def add_handler_trainer(handlers):
 
 class Trainer:
     def __init__(self,
-                 discriminator,
-                 attr_discriminator,
-                 generator,
                  criterion,
-                 dis_optimizer,
-                 addi_dis_optimizer,
-                 gen_optimizer,
                  real_train_dl,
                  data_feature_shape,
                  device,
@@ -34,15 +29,48 @@ class Trainer:
                  attr_dis_lambda_gp=10,
                  g_attr_d_coe=1,
                  d_rounds=1,
-                 g_rounds=1
+                 g_rounds=1,
+                 gan_type='RNN',
+                 att_dim=100,
+                 num_heads=10,
+                 g_lr=0.0001,
+                 g_beta1=0.5,
+                 d_lr=0.0001,
+                 d_beta1=0.5,
+                 attr_d_lr=0.0001,
+                 attr_d_beta1=0.5
                  ):
-        self.dis = discriminator
-        self.attr_dis = attr_discriminator
-        self.gen = generator
+        # setup models
+        self.dis = Discriminator(real_train_dl.dataset.data_feature_shape, real_train_dl.dataset.data_attribute_shape)
+        self.attr_dis = AttrDiscriminator(real_train_dl.dataset.data_attribute_shape)
+        if gan_type == 'RNN':
+            noise_dim = noise_dim
+        else:
+            noise_dim = att_dim - real_train_dl.dataset.data_attribute.shape[1]
+
+        if gan_type == "RNN":
+            self.gen = DoppelGANgerGeneratorRNN(noise_dim=noise_dim,
+                                                feature_outputs=real_train_dl.dataset.data_feature_outputs,
+                                                attribute_outputs=real_train_dl.dataset.data_attribute_outputs,
+                                                real_attribute_mask=real_train_dl.dataset.real_attribute_mask,
+                                                device=device,
+                                                sample_len=sample_len)
+        else:
+            self.gen = DoppelGANgerGeneratorAttention(noise_dim=noise_dim,
+                                                      feature_outputs=real_train_dl.dataset.data_feature_outputs,
+                                                      attribute_outputs=real_train_dl.dataset.data_attribute_outputs,
+                                                      real_attribute_mask=real_train_dl.dataset.real_attribute_mask,
+                                                      device=device,
+                                                      sample_len=sample_len, num_heads=num_heads, attn_dim=att_dim)
+
         self.criterion = criterion
-        self.dis_opt = dis_optimizer
-        self.attr_dis_opt = addi_dis_optimizer
-        self.gen_opt = gen_optimizer
+        # setup optimizer
+        self.dis_opt = torch.optim.Adam(self.dis.parameters(), lr=d_lr, betas=(d_beta1, 0.999))
+        self.attr_dis_opt = torch.optim.Adam(self.attr_dis.parameters(), lr=attr_d_lr, betas=(attr_d_beta1, 0.999))
+        self.gen_opt = torch.optim.Adam(self.gen.parameters(), lr=g_lr, betas=(g_beta1, 0.999))
+        # self.dis_opt = dis_optimizer
+        # self.attr_dis_opt = addi_dis_optimizer
+        # self.gen_opt = gen_optimizer
         self.real_train_dl = real_train_dl
         self.data_feature_shape = data_feature_shape
         if data_feature_shape[1] % sample_len != 0:
@@ -65,6 +93,7 @@ class Trainer:
         self.gen = self.gen.to(self.device)
         self.EPS = 1e-8
 
+    # TODO: use helper function in gan_util
     def gen_attribute_input_noise(self, num_sample):
         return torch.randn(size=[num_sample, self.noise_dim])
 
@@ -115,8 +144,10 @@ class Trainer:
         self.attr_dis.device = self.device
         self.gen.device = self.device
 
-    def sample_from(self, real_attribute_noise, addi_attribute_noise, feature_input_noise,
-                    return_gen_flag_feature=False):
+    def sample_from(self, batch_size, return_gen_flag_feature=False):
+        real_attribute_noise = self.gen_attribute_input_noise(batch_size).to(self.device)
+        addi_attribute_noise = self.gen_attribute_input_noise(batch_size).to(self.device)
+        feature_input_noise = self.gen_feature_input_noise(batch_size, self.sample_time).to(self.device)
         self.dis.eval()
         self.attr_dis.eval()
         self.gen.eval()
@@ -126,7 +157,6 @@ class Trainer:
                                             feature_input_noise)
             attributes = attributes.cpu().numpy()
             features = features.cpu().numpy()
-            # attributes = torch.cat((attributes, addi_attributes), dim=1)
 
             # TODO: possible without loop?!
             gen_flags = np.zeros(features.shape[:-1])
@@ -358,5 +388,5 @@ class Trainer:
             # save model
             if epoch % saver_frequency == 0:
                 self.save(epoch)
-                #self.inference(data_attribute, epoch)
+                # self.inference(data_attribute, epoch)
         self.writer.close()

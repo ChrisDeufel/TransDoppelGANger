@@ -22,23 +22,26 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 from data import TimeGanData
-from util import extract_len, random_generator, NormMinMax
+from util import extract_len, random_generator, NormMinMax, setup_logger, add_handler
 from gan.timegan import Encoder, Recovery, Generator, Discriminator, Supervisor
 from torch.utils.data import DataLoader
 import logging
 
-time_logger = logging.getLogger(__name__)
-time_logger.setLevel(logging.INFO)
-config_logger = logging.getLogger(__name__)
-config_logger.setLevel(logging.INFO)
+# time_logger = logging.getLogger(__name__)
+# time_logger.setLevel(logging.INFO)
+# config_logger = logging.getLogger(__name__)
+# config_logger.setLevel(logging.INFO)
 
-def add_handler_trainer(handlers):
-    for handler in handlers:
-        time_logger.addHandler(handler)
 
-def add_config_handler_trainer(handlers):
-    for handler in handlers:
-        config_logger.addHandler(handler)
+# def add_handler_trainer(handlers):
+#     for handler in handlers:
+#         time_logger.addHandler(handler)
+#
+#
+# def add_config_handler_trainer(handlers):
+#     for handler in handlers:
+#         config_logger.addHandler(handler)
+
 
 class TimeGAN:
     """TimeGAN Class
@@ -46,7 +49,7 @@ class TimeGAN:
 
     @property
     def name(self):
-      return 'TimeGAN'
+        return 'TimeGAN'
 
     def __init__(self,
                  train_loader,
@@ -61,7 +64,9 @@ class TimeGAN:
                  w_es=0.1,
                  w_e0=10,
                  w_g=100,
-                 checkpoint_dir=""):
+                 checkpoint_dir="",
+                 config_log="",
+                 time_log=""):
         torch.backends.cudnn.enabled = False
         # Initalize variables.
         self.train_dl = train_loader
@@ -77,11 +82,24 @@ class TimeGAN:
         self.w_e0 = w_e0
         self.w_g = w_g
         self.checkpoint_dir = checkpoint_dir
-        config_logger.info("Learning Rate: {0}".format(self.lr))
-        config_logger.info("Z-Dimension: {0}".format(self.z_dim))
-        config_logger.info("Hidden Dimension: {0}".format(self.hidden_dim))
-        config_logger.info("Num Layer: {0}".format(self.num_layer))
-        config_logger.info("Beta 1: {0}".format(self.beta1))
+        if config_log is not None:
+            self.config_logger = setup_logger(name="config_logger", log_file=config_log,
+                                              formatter=logging.Formatter('%(message)s'))
+            self.time_logger = setup_logger(name="time_logger", log_file=time_log,
+                                            formatter=logging.Formatter('%(asctime)s:%(message)s'))
+            stream_handler = logging.StreamHandler()
+            stream_handler.setLevel(logging.INFO)
+            add_handler(handlers=[stream_handler], logger=self.time_logger)
+            self.config_logger.info("Learning Rate: {0}".format(self.lr))
+            self.config_logger.info("Z-Dimension: {0}".format(self.z_dim))
+            self.config_logger.info("Hidden Dimension: {0}".format(self.hidden_dim))
+            self.config_logger.info("Num Layer: {0}".format(self.num_layer))
+            self.config_logger.info("Beta 1: {0}".format(self.beta1))
+            self.config_logger.info("w_gamma: {0}".format(self.w_gamma))
+            self.config_logger.info("w_es: {0}".format(self.w_es))
+            self.config_logger.info("w_g: {0}".format(self.w_g))
+            self.config_logger.info("w_e0: {0}".format(self.w_e0))
+            self.config_logger.info("data_feature_shape: {0}".format(self.train_dl.dataset.data_feature_shape))
 
         # calculate variables
         self.min_val = train_loader.dataset.min_val
@@ -91,22 +109,23 @@ class TimeGAN:
         self.data_num, _, _ = train_loader.dataset.data_feature.shape  # 3661; 24; 6
 
         # -- Misc attributes
-        # self.epoch = 0
-        # self.times = []
-        # self.total_steps = 0
         # Create and initialize networks.
         # determine input size for encoder
         num_features = self.train_dl.dataset.data_feature.shape[2]
-        self.nete = Encoder(input_size=num_features, hidden_dim=self.hidden_dim, num_layer=self.num_layer).to(self.device)
-        self.netr = Recovery(output_size=num_features, hidden_dim=self.hidden_dim, num_layer=self.num_layer).to(self.device)
+        self.nete = Encoder(input_size=num_features, hidden_dim=self.hidden_dim, num_layer=self.num_layer).to(
+            self.device)
+        self.netr = Recovery(output_size=num_features, hidden_dim=self.hidden_dim, num_layer=self.num_layer).to(
+            self.device)
         self.netg = Generator(z_dim=self.z_dim, hidden_dim=self.hidden_dim, num_layer=self.num_layer).to(self.device)
-        self.netd = Discriminator(z_dim=self.z_dim, hidden_dim=self.hidden_dim, num_layer=self.num_layer).to(self.device)
+        self.netd = Discriminator(z_dim=self.z_dim, hidden_dim=self.hidden_dim, num_layer=self.num_layer).to(
+            self.device)
         self.nets = Supervisor(z_dim=self.z_dim, hidden_dim=self.hidden_dim, num_layer=self.num_layer).to(self.device)
-        config_logger.info("nete: {0}".format(self.nete))
-        config_logger.info("netr: {0}".format(self.netr))
-        config_logger.info("netg: {0}".format(self.netg))
-        config_logger.info("netd: {0}".format(self.netd))
-        config_logger.info("nets: {0}".format(self.nets))
+        if config_log is not None:
+            self.config_logger.info("nete: {0}".format(self.nete))
+            self.config_logger.info("netr: {0}".format(self.netr))
+            self.config_logger.info("netg: {0}".format(self.netg))
+            self.config_logger.info("netd: {0}".format(self.netd))
+            self.config_logger.info("nets: {0}".format(self.nets))
 
         # loss
         self.l_mse = nn.MSELoss()
@@ -197,26 +216,28 @@ class TimeGAN:
         self.err_er = self.l_mse(self.X, self.X_tilde)
         self.err_er.backward(retain_graph=True)
 
-        #print("Loss: ", self.err_er)
+        # print("Loss: ", self.err_er)
 
     def backward_g(self):
         """ Backpropagate through netG
         """
         self.err_g_U = self.l_bce(torch.ones_like(self.Y_fake), self.Y_fake)
         self.err_g_U_e = self.l_bce(torch.ones_like(self.Y_fake_e), self.Y_fake_e)
-        self.err_g_V1 = torch.mean(torch.abs(torch.sqrt(torch.std(self.X_hat,[0])[1] + 1e-6) - torch.sqrt(torch.std(self.X,[0])[1] + 1e-6)))   # |a^2 - b^2|
-        self.err_g_V2 = torch.mean(torch.abs((torch.mean(self.X_hat,[0])[0]) - (torch.mean(self.X,[0])[0])))  # |a - b|
+        self.err_g_V1 = torch.mean(torch.abs(torch.sqrt(torch.std(self.X_hat, [0])[1] + 1e-6) - torch.sqrt(
+            torch.std(self.X, [0])[1] + 1e-6)))  # |a^2 - b^2|
+        self.err_g_V2 = torch.mean(
+            torch.abs((torch.mean(self.X_hat, [0])[0]) - (torch.mean(self.X, [0])[0])))  # |a - b|
         self.err_g = self.err_g_U + \
-                   self.err_g_U_e * self.w_gamma + \
-                   self.err_g_V1 * self.w_g + \
-                   self.err_g_V2 * self.w_g
+                     self.err_g_U_e * self.w_gamma + \
+                     self.err_g_V1 * self.w_g + \
+                     self.err_g_V2 * self.w_g
 
         self.err_g.backward(retain_graph=True)
 
     def backward_s(self):
         """ Backpropagate through netS
         """
-        self.err_s = self.l_mse(self.H[:,1:,:], self.H_supervise[:,:-1,:])
+        self.err_s = self.l_mse(self.H[:, 1:, :], self.H_supervise[:, :-1, :])
         self.err_s.backward(retain_graph=True)
 
     def backward_d(self):
@@ -226,8 +247,8 @@ class TimeGAN:
         self.err_d_fake = self.l_bce(torch.ones_like(self.Y_fake), self.Y_fake)
         self.err_d_fake_e = self.l_bce(torch.ones_like(self.Y_fake_e), self.Y_fake_e)
         self.err_d = self.err_d_real + \
-                   self.err_d_fake + \
-                   self.err_d_fake_e * self.w_gamma
+                     self.err_d_fake + \
+                     self.err_d_fake_e * self.w_gamma
         if self.err_d > 0.15:
             self.err_d.backward(retain_graph=True)
 
@@ -281,7 +302,7 @@ class TimeGAN:
         self.forward_e()
         self.forward_g()
         self.forward_sg()
-        #self.forward_dg()
+        # self.forward_dg()
         self.forward_d()
 
         # Backward-pass
@@ -340,7 +361,6 @@ class TimeGAN:
         # train encoder & decoder
         self.optimize_params_er()
 
-
     def train_one_iter_s(self, lengths, data_feature):
         """ Train the model for one epoch.
         """
@@ -365,7 +385,8 @@ class TimeGAN:
 
         # set mini-batch
         self.X, self.T = data_feature, lengths
-        self.Z = torch.tensor(random_generator(self.batch_size, self.z_dim, self.T, self.max_seq_len), dtype=torch.float32).to(self.device)
+        self.Z = torch.tensor(random_generator(self.batch_size, self.z_dim, self.T, self.max_seq_len),
+                              dtype=torch.float32).to(self.device)
 
         # train superviser
         self.optimize_params_g()
@@ -381,7 +402,8 @@ class TimeGAN:
 
         # set mini-batch
         self.X, self.T = data_feature, lengths
-        self.Z = torch.tensor(random_generator(self.batch_size, self.z_dim, self.T, self.max_seq_len), dtype=torch.float32).to(self.device)
+        self.Z = torch.tensor(random_generator(self.batch_size, self.z_dim, self.T, self.max_seq_len),
+                              dtype=torch.float32).to(self.device)
 
         # train superviser
         self.optimize_params_d()
@@ -394,14 +416,14 @@ class TimeGAN:
                 lengths = lengths.to(self.device)
                 data_feature = data_feature.to(self.device)
                 self.train_one_iter_er(lengths, data_feature)
-            time_logger.info('END OF EPOCH {0} - ENCODER/RECOVERY'.format(iter))
+            self.time_logger.info('END OF EPOCH {0} - ENCODER/RECOVERY'.format(iter))
 
         for iter in range(epochs):
             for batch_idx, (lengths, data_feature) in enumerate(self.train_dl):
                 lengths = lengths.to(self.device)
                 data_feature = data_feature.to(self.device)
                 self.train_one_iter_s(lengths, data_feature)
-            time_logger.info('END OF EPOCH {0} - GENERATOR'.format(iter))
+            self.time_logger.info('END OF EPOCH {0} - GENERATOR'.format(iter))
 
         for iter in range(epochs):
             for batch_idx, (lengths, data_feature) in enumerate(self.train_dl):
@@ -411,29 +433,29 @@ class TimeGAN:
                     self.train_one_iter_g(lengths, data_feature)
                     self.train_one_iter_er(lengths, data_feature)
                 self.train_one_iter_d(lengths, data_feature)
-            time_logger.info('END OF EPOCH {0} - GENERATOR/DISCRIMINATOR'.format(iter))
+            self.time_logger.info('END OF EPOCH {0} - GENERATOR/DISCRIMINATOR'.format(iter))
             if iter % saver_frequency == 0:
                 self.save(iter)
 
-        self.generated_data = self.generation()
-        print('Finish Synthetic Data Generation')
-
-    def generation(self):
+    def sample_from(self, batch_size, return_gen_flag_feature=False):
         ## Synthetic data generation
-        self.Z = torch.tensor(random_generator(self.batch_size, self.z_dim, self.T, self.max_seq_len), dtype=torch.float32).to(self.device)
+        self.Z = torch.tensor(random_generator(batch_size, self.z_dim, self.lengths, self.max_seq_len),
+                              dtype=torch.float32).to(self.device)
         self.E_hat = self.netg(self.Z)  # [?, 24, 24]
         self.H_hat = self.nets(self.E_hat)  # [?, 24, 24]
-        generated_data_curr = self.netr(self.H_hat)  # [?, 24, 24]
-
-        # generated_data = list()
-        #
-        # for i in range(self.data_num):
-        #     temp = generated_data_curr[i, :self.lengths[i], :]
-        #     generated_data.append(temp)
-        #
-        # # Renormalization
-        # generated_data = generated_data * self.max_val
-        # generated_data = generated_data + self.min_val
-
-        return generated_data_curr
-
+        features = self.netr(self.H_hat)  # [?, 24, 24]
+        features = features.detach().cpu().numpy()
+        attributes = torch.zeros((batch_size, self.train_dl.dataset.data_attribute_shape[1]))
+        gen_flags = np.zeros(features.shape[:-1])
+        lengths = np.zeros(features.shape[0])
+        for i in range(len(features)):
+            winner = (features[i, :, -1] > features[i, :, -2])
+            argmax = np.argmax(winner == True)
+            if argmax == 0:
+                gen_flags[i, :] = 1
+            else:
+                gen_flags[i, :argmax] = 1
+            lengths[i] = argmax
+        if not return_gen_flag_feature:
+            features = features[:, :, :-2]
+        return features, attributes.cpu().numpy(), gen_flags, lengths

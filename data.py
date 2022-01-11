@@ -155,7 +155,7 @@ class DCData(Dataset):
 
 
 class TimeGanData(Dataset):
-    def __init__(self, transforms=None, normalize=False, gen_flag=False, size=None, name='web'):
+    def __init__(self, transforms=None, normalize=False, gen_flag=True, size=None, sample_len=1, name='web'):
         (self.data_feature, self.data_attribute, self.data_gen_flag,
          self.data_feature_outputs, self.data_attribute_outputs) = load_data("data/{0}".format(name))
         self.transforms = transforms
@@ -175,9 +175,9 @@ class TimeGanData(Dataset):
                                                               self.data_feature_outputs, self.data_attribute_outputs,
                                                               self.data_gen_flag)
 
-        # if gen_flag:
-        #     self.data_feature, self.data_feature_outputs = add_gen_flag(self.data_feature, self.data_gen_flag,
-        #                                                                 self.data_feature_outputs, sample_len)
+        if gen_flag:
+            self.data_feature, self.data_feature_outputs = add_gen_flag(self.data_feature, self.data_gen_flag,
+                                                                        self.data_feature_outputs, sample_len)
         self.data_feature_shape = self.data_feature.shape
         self.data_attribute_shape = self.data_attribute.shape
 

@@ -10,7 +10,7 @@ import os
 import numpy as np
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
-#device = "cpu"
+# device = "cpu"
 dataset = "index_growth_1mo"
 gan_type = 'RNN'
 checkpoint_dir = 'runs/{}/{}/test/checkpoint'.format(dataset, gan_type)
@@ -46,11 +46,7 @@ if dataset == "transactions":
 else:
     dataset = Data(sample_len=sample_len, name=dataset)
 real_train_dl = DataLoader(dataset=dataset, batch_size=batch_size, shuffle=True)
-
-if gan_type == 'RNN':
-    noise_dim = 5
-else:
-    noise_dim = attn_dim - dataset.data_attribute.shape[1]
+noise_dim = 5
 
 attn_mask = True
 num_heads = 10
@@ -61,38 +57,33 @@ logger.info("Attention Mask: {0}".format(attn_mask))
 logger.info("Number of Attention Heads: {0}".format(num_heads))
 
 # generate discriminators and generator
-discriminator = Discriminator(dataset.data_feature_shape, dataset.data_attribute_shape)
-logger.info("DISCRIMINATOR: {0}".format(discriminator))
-attr_discriminator = AttrDiscriminator(dataset.data_attribute_shape)
-logger.info("ATTRIBUTE DISCRIMINATOR: {0}".format(attr_discriminator))
+# discriminator = Discriminator(dataset.data_feature_shape, dataset.data_attribute_shape)
+# logger.info("DISCRIMINATOR: {0}".format(discriminator))
+# attr_discriminator = AttrDiscriminator(dataset.data_attribute_shape)
+# logger.info("ATTRIBUTE DISCRIMINATOR: {0}".format(attr_discriminator))
 
-if gan_type == "RNN":
-    generator = DoppelGANgerGeneratorRNN(noise_dim=noise_dim, feature_outputs=dataset.data_feature_outputs,
-                                         attribute_outputs=dataset.data_attribute_outputs,
-                                         real_attribute_mask=dataset.real_attribute_mask, device=device,
-                                         sample_len=sample_len)
-else:
-    generator = DoppelGANgerGeneratorAttention(noise_dim=noise_dim, feature_outputs=dataset.data_feature_outputs,
-                                               attribute_outputs=dataset.data_attribute_outputs,
-                                               real_attribute_mask=dataset.real_attribute_mask, device=device,
-                                               sample_len=sample_len, num_heads=num_heads, attn_dim=attn_dim)
+# if gan_type == "RNN":
+#     generator = DoppelGANgerGeneratorRNN(noise_dim=noise_dim, feature_outputs=dataset.data_feature_outputs,
+#                                          attribute_outputs=dataset.data_attribute_outputs,
+#                                          real_attribute_mask=dataset.real_attribute_mask, device=device,
+#                                          sample_len=sample_len)
+# else:
+#     generator = DoppelGANgerGeneratorAttention(noise_dim=noise_dim, feature_outputs=dataset.data_feature_outputs,
+#                                                attribute_outputs=dataset.data_attribute_outputs,
+#                                                real_attribute_mask=dataset.real_attribute_mask, device=device,
+#                                                sample_len=sample_len, num_heads=num_heads, attn_dim=attn_dim)
 
-
-logger.info("GENERATOR: {0}".format(generator))
+# logger.info("GENERATOR: {0}".format(generator))
 # define optimizer
-g_lr = 0.0001
+g_lr = 0.001
 g_beta1 = 0.5
 logger.info("g_lr: {0} / g_beta1: {1}".format(g_lr, g_beta1))
-d_lr = 0.0001
+d_lr = 0.001
 d_beta1 = 0.5
 logger.info("d_lr: {0} / d_beta1: {1}".format(d_lr, d_beta1))
-attr_d_lr = 0.0001
+attr_d_lr = 0.001
 attr_d_beta1 = 0.5
 logger.info("attr_d_lr: {0} / attr_d_beta1: {1}".format(attr_d_lr, attr_d_beta1))
-
-attr_opt = torch.optim.Adam(discriminator.parameters(), lr=d_lr, betas=(0.5, 0.999))
-d_attr_opt = torch.optim.Adam(attr_discriminator.parameters(), lr=attr_d_lr, betas=(0.5, 0.999))
-gen_opt = torch.optim.Adam(generator.parameters(), lr=g_lr, betas=(0.5, 0.999))
 
 data_feature_shape = dataset.data_feature_shape
 # define Hyperparameters
@@ -108,9 +99,9 @@ logger.info("attr_d_gp_coefficient: {0}".format(attr_d_gp_coe))
 g_attr_d_coe = 1.0
 logger.info("g_attr_d_coe: {0}".format(g_attr_d_coe))
 
-trainer = Trainer(discriminator=discriminator, attr_discriminator=attr_discriminator, generator=generator,
-                  criterion=None, dis_optimizer=attr_opt, addi_dis_optimizer=d_attr_opt, gen_optimizer=gen_opt,
-                  real_train_dl=real_train_dl, data_feature_shape=data_feature_shape, device=device,
+trainer = Trainer(criterion=None, real_train_dl=real_train_dl, data_feature_shape=data_feature_shape, device=device,
                   checkpoint_dir=checkpoint_dir, noise_dim=noise_dim,
-                  sample_len=sample_len, d_rounds=d_rounds, g_rounds=g_rounds)
+                  sample_len=sample_len, d_rounds=d_rounds, g_rounds=g_rounds, gan_type=gan_type,
+                  att_dim=attn_dim, num_heads=num_heads, g_lr=g_lr, g_beta1=g_beta1, d_lr=d_lr,
+                  d_beta1=d_beta1, attr_d_lr=attr_d_lr, attr_d_beta1=attr_d_beta1)
 trainer.train(epochs=epoch, writer_frequency=1, saver_frequency=20)
