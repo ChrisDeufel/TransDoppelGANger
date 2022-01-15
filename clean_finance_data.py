@@ -15,7 +15,7 @@ def calc_decade(year):
     else:
         return 2
 
-measurement = "price"
+measurement = "growth"
 
 ################# ATTRIBUTES #################
 data_attribute_outputs = []
@@ -33,11 +33,12 @@ if measurement == "price":
 else:
     norm = Normalization.MINUSONE_ONE
 data_feature_outputs.append(Output(type_=OutputType.CONTINUOUS, dim=1, normalization=norm))
-
+# range
+data_feature_outputs.append(Output(type_=OutputType.CONTINUOUS, dim=1, normalization=Normalization.ZERO_ONE))
 start_year = 1990
 end_year = 2021
 months = ["01", "02", "03", "04", "05", "06", "07", "08", "09", "10", "11", "12"]
-m_intervall = 1
+m_intervall = 12
 
 
 max_seq_len = 25*m_intervall
@@ -91,7 +92,7 @@ indices = [{"ticker": "^GSPC", "continent": 1, "country": "USA"},
            {"ticker": "^W5000", "continent": 1, "country": "US"}
            ]
 
-path = "data/index_{}_{}mo".format(measurement, str(m_intervall))
+path = "data/index_{}_range_{}mo".format(measurement, str(m_intervall))
 if not os.path.exists(path):
     os.makedirs(path)
 f = open("{}/description.txt".format(path), "a")
@@ -126,6 +127,7 @@ for index in indices:
                 continue
             raw_data['Open'] = raw_data['Open'].fillna(method='ffill')
             raw_data['Growth'] = ((raw_data['Close']-raw_data['Open'])/raw_data['Open'])
+            raw_data['Range'] = raw_data['High']-raw_data['Low']
             # add attributes
             # continent
             cont = np.zeros(len(continent))
@@ -136,13 +138,15 @@ for index in indices:
             attribute = np.expand_dims(np.concatenate((cont, dec)), axis=0)
             data_attribute = np.concatenate((data_attribute, attribute), axis=0)
             # add features
-            # course
-            feature = np.zeros((max_seq_len, 1))
+            # price or growth
+            feature = np.zeros((max_seq_len, 2))
             if measurement == "price":
                 current_course = np.asarray(raw_data['Open'])
             else:
                 current_course = np.asarray(raw_data['Growth'])
+            current_range = np.asarray(raw_data['Range'])
             feature[:len(current_course), 0] = current_course
+            feature[:len(current_range), 1] = current_range
             feature = np.expand_dims(feature, axis=0)
             data_feature = np.concatenate((data_feature, feature), axis=0)
             # add gen flag

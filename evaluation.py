@@ -429,6 +429,8 @@ def measurement_distribution(dir, data, feature_output, nr_bins=100):
                             bin = int((value + 1) * (nr_bins / 2))
                         if bin >= nr_bins:
                             bins[nr_bins - 1] += 1
+                        elif bin < 0:
+                            bins[0] += 1
                         else:
                             bins[bin] += 1
             data_to_plot.append({'bins': bins, 'name': set['name'], 'color': set['color']})
@@ -690,7 +692,7 @@ def mse_autocorrelation(dir, real_data_features, sample_data_features, data_feat
 
 # load web dataset for testing
 dataset_name = 'index_growth_1mo'
-gan_type = 'Time_GAN'
+gan_type = 'RGAN'
 # load original data
 (data_feature, data_attribute, data_gen_flag, data_feature_outputs, data_attribute_outputs) = \
     load_data("data/{0}".format(dataset_name))
@@ -741,13 +743,13 @@ for i in range(1, 2):
         # cross_measurement(dir=evaluation_dir, data=data, nr_bins=100)
         # measurement_distribution(dir=evaluation_dir, data=data, feature_output=data_feature_outputs)
         # emd(dir=evaluation_dir, data=data, data_feature_output=data_feature_outputs)
-        # autocorrelation(dir=evaluation_dir, data=data, data_feature_output=data_feature_outputs, n_lags=8,
-        #                 partial=True)
+        autocorrelation(dir=evaluation_dir, data=data, data_feature_output=data_feature_outputs, n_lags=8,
+                        partial=True)
         # nearest_neighbors(dir=evaluation_dir, real_data_features=data_feature, sampled_data_features=sampled_features,
         #                   data_feature_outputs=data_feature_outputs)
         # meta_meas_corr(dir=evaluation_dir, data=data, data_attribute_outputs=data_attribute_outputs,
         #                data_feature_outputs=data_feature_outputs)
         # mse_autocorrelation(dir=evaluation_dir, real_data_features=data_feature, sample_data_features=sampled_features,
         #                    data_feature_outputs=data_feature_outputs)
-        embedding(dir=evaluation_dir, data=data, data_feature_output=data_feature_outputs, embedding='PCA')
+        # embedding(dir=evaluation_dir, data=data, data_feature_output=data_feature_outputs, embedding='PCA')
         # qq_plot(dir=evaluation_dir, data=data, data_feature_output=data_feature_outputs, metric='kurtosis')

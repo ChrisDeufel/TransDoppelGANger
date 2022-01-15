@@ -5,7 +5,7 @@ from data import TimeGanData
 import os
 from trainer_timeGAN import TimeGAN
 
-dataset_name = "index_growth_1mo"
+dataset_name = "index_growth_3mo"
 batch_size = 20
 dataset = TimeGanData(name=dataset_name)
 device = "cuda" if torch.cuda.is_available() else "cpu"
