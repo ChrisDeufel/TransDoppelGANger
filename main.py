@@ -13,11 +13,11 @@ device = "cuda" if torch.cuda.is_available() else "cpu"
 # device = "cpu"
 dataset = "index_growth_1mo"
 gan_type = 'RNN'
-checkpoint_dir = 'runs/{}/{}/test/checkpoint'.format(dataset, gan_type)
+checkpoint_dir = 'runs/{}/{}/test_2/checkpoint'.format(dataset, gan_type)
 if not os.path.exists(checkpoint_dir):
     os.makedirs(checkpoint_dir)
-time_logging_file = 'runs/{}/{}/test/time.log'.format(dataset, gan_type)
-config_logging_file = 'runs/{}/{}/test/config.log'.format(dataset, gan_type)
+time_logging_file = 'runs/{}/{}/test_2/time.log'.format(dataset, gan_type)
+config_logging_file = 'runs/{}/{}/test_2/config.log'.format(dataset, gan_type)
 # SET UP LOGGING
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)

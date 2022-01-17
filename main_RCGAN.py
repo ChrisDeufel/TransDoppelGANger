@@ -10,7 +10,7 @@ batch_size = 20
 dataset = Data(name=dataset_name, sample_len=1)
 #device = "cuda" if torch.cuda.is_available() else "cpu"
 device = "cpu"
-gan_type = "RCGAN"
+gan_type = "RGAN"
 if gan_type == 'RGAN':
     isConditional = False
 else:

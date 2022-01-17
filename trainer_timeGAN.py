@@ -117,9 +117,9 @@ class TimeGAN:
         self.netr = Recovery(output_size=num_features, hidden_dim=self.hidden_dim, num_layer=self.num_layer).to(
             self.device)
         self.netg = Generator(z_dim=self.z_dim, hidden_dim=self.hidden_dim, num_layer=self.num_layer).to(self.device)
-        self.netd = Discriminator(z_dim=self.z_dim, hidden_dim=self.hidden_dim, num_layer=self.num_layer).to(
+        self.netd = Discriminator(hidden_dim=self.hidden_dim, num_layer=self.num_layer).to(
             self.device)
-        self.nets = Supervisor(z_dim=self.z_dim, hidden_dim=self.hidden_dim, num_layer=self.num_layer).to(self.device)
+        self.nets = Supervisor(hidden_dim=self.hidden_dim, num_layer=self.num_layer).to(self.device)
         if config_log is not None:
             self.config_logger.info("nete: {0}".format(self.nete))
             self.config_logger.info("netr: {0}".format(self.netr))

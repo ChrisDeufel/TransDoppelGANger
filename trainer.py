@@ -6,6 +6,7 @@ import os
 import logging
 from loss_util import gradient_penalty
 from gan.network import AttrDiscriminator, Discriminator, DoppelGANgerGeneratorRNN, DoppelGANgerGeneratorAttention
+from util import calculate_mmd_rbf
 
 time_logger = logging.getLogger(__name__)
 time_logger.setLevel(logging.INFO)
@@ -68,9 +69,7 @@ class Trainer:
         self.dis_opt = torch.optim.Adam(self.dis.parameters(), lr=d_lr, betas=(d_beta1, 0.999))
         self.attr_dis_opt = torch.optim.Adam(self.attr_dis.parameters(), lr=attr_d_lr, betas=(attr_d_beta1, 0.999))
         self.gen_opt = torch.optim.Adam(self.gen.parameters(), lr=g_lr, betas=(g_beta1, 0.999))
-        # self.dis_opt = dis_optimizer
-        # self.attr_dis_opt = addi_dis_optimizer
-        # self.gen_opt = gen_optimizer
+
         self.real_train_dl = real_train_dl
         self.data_feature_shape = data_feature_shape
         if data_feature_shape[1] % sample_len != 0:
@@ -294,12 +293,13 @@ class Trainer:
             "gen_d_rl": 0,
             "gen_attr_d_rl": 0
         }
-
+        avg_mmd = []
         n_total_steps = len(self.real_train_dl)
         for epoch in range(epochs):
             self.dis.train()
             self.attr_dis.train()
             self.gen.train()
+            mmd = []
             for batch_idx, (data_attribute, data_feature) in enumerate(self.real_train_dl):
                 data_attribute = data_attribute.to(self.device)
                 data_feature = data_feature.to(self.device)
@@ -312,7 +312,13 @@ class Trainer:
                     fake_attribute, fake_feature = self.gen(real_attribute_noise,
                                                             addi_attribute_noise,
                                                             feature_input_noise)
-
+                    # calculate mmd
+                    # for i in range(len(data_feature)):
+                    #     mmd.append(
+                    #         calculate_mmd_rbf(fake_feature[i, :, :].detach().cpu().numpy(),
+                    #                           data_feature[i, :, :].detach().cpu().numpy()))
+                    mmd.append(calculate_mmd_rbf(torch.mean(fake_feature, dim=0).detach().cpu().numpy(),
+                                                 torch.mean(data_feature, dim=0).detach().cpu().numpy()))
                     # discriminator
                     dis_real = self.dis(data_feature, data_attribute)
                     dis_fake = self.dis(fake_feature, fake_attribute)
@@ -385,8 +391,10 @@ class Trainer:
                                                          batch_idx)
 
             time_logger.info('END OF EPOCH {0}'.format(epoch))
+            avg_mmd.append(np.asarray(mmd).mean())
             # save model
             if epoch % saver_frequency == 0:
                 self.save(epoch)
                 # self.inference(data_attribute, epoch)
+        np.save("{}/mmd.npy".format(self.checkpoint_dir), np.asarray(avg_mmd))
         self.writer.close()

@@ -3,6 +3,9 @@ import numpy as np
 import matplotlib
 import os
 import pickle
+from torch.distributions.multivariate_normal import MultivariateNormal
+import torch
+from sklearn import metrics
 
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
@@ -428,3 +431,20 @@ def random_generator(batch_size, z_dim, T_mb, max_seq_len):
     #     temp[:T_mb[i], :] = temp_Z
     #     Z_mb.append(temp_Z)
     return Z_mb
+
+
+# https://github.com/jindongwang/transferlearning/blob/master/code/distance/mmd_numpy_sklearn.py
+def calculate_mmd_rbf(X, Y, gamma=1.0):
+    """MMD using rbf (gaussian) kernel (i.e., k(x,y) = exp(-gamma * ||x-y||^2 / 2))
+    Arguments:
+        X {[n_sample1, dim]} -- [X matrix]
+        Y {[n_sample2, dim]} -- [Y matrix]
+    Keyword Arguments:
+        gamma {float} -- [kernel parameter] (default: {1.0})
+    Returns:
+        [scalar] -- [MMD value]
+    """
+    XX = metrics.pairwise.rbf_kernel(X, X, gamma)
+    YY = metrics.pairwise.rbf_kernel(Y, Y, gamma)
+    XY = metrics.pairwise.rbf_kernel(X, Y, gamma)
+    return XX.mean() + YY.mean() - 2 * XY.mean()

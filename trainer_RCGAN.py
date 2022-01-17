@@ -6,6 +6,7 @@ import logging
 from gan.rcgan import RGANGenerator, RGANDiscriminator
 from gan.gan_util import gen_noise
 import numpy as np
+import torch.nn.functional as F
 
 time_logger = logging.getLogger(__name__)
 time_logger.setLevel(logging.INFO)
@@ -34,7 +35,7 @@ class RCGAN:
     def __init__(self,
                  train_loader,
                  device,
-                 lr=0.001,
+                 lr=0.1,
                  noise_size=5,
                  hidden_size_gen=100,
                  num_layer_gen=1,

@@ -10,8 +10,9 @@ from gan.modules import MultiHeadAttention
 
 # torch.utils.backcompat.broadcast_warning.enabled = True
 # Transformer Discriminator
+"""
 class TransformerDiscriminator(nn.Module):
-    def __init__(self, input_feature_shape, input_attribute_shape, num_layers=5, num_units=200,
+    def __init__(self, input_feature_shape, input_attribute_shape, num_heads=5, attn_dim=200,
                  scope_name="transformer_discriminator", *args, **kwargs):
         super(TransformerDiscriminator, self).__init__()
         self.scope_name = scope_name
@@ -19,6 +20,7 @@ class TransformerDiscriminator(nn.Module):
         self.input_feature_shape = input_feature_shape
         self.input_attribute_shape = input_attribute_shape
         self.input_size = input_feature_shape[1] * input_feature_shape[2] + input_attribute_shape[1]
+        self.positional_encoding = PositionalEncoding(d_model=)
         self.decoder = torch.nn.TransformerDecoderLayer(d_model=attn_dim, nhead=num_heads, dim_feedforward=attn_dim,
                                                         batch_first=True)
         modules = [nn.Linear(self.input_size, num_units), nn.ReLU()]
@@ -36,7 +38,7 @@ class TransformerDiscriminator(nn.Module):
         input_attribute = torch.flatten(input_attribute, start_dim=1, end_dim=1)
         x = torch.cat((input_feature, input_attribute), dim=1)
         return self.disc(x)
-
+"""
 
 # Discriminator
 class Discriminator(nn.Module):
