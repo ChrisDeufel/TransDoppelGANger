@@ -9,24 +9,46 @@ from gan.network import AttrDiscriminator, Discriminator, DoppelGANgerGeneratorR
     TransformerDiscriminator
 from util import calculate_mmd_rbf
 
-time_logger = logging.getLogger(__name__)
-time_logger.setLevel(logging.INFO)
-
-
-def add_handler_trainer(handlers):
+def add_handler(logger, handlers):
     for handler in handlers:
-        time_logger.addHandler(handler)
+        logger.addHandler(handler)
+
+def setup_logging(time_logging_file, config_logging_file):
+    # SET UP LOGGING
+    config_logger = logging.getLogger("config_logger")
+    config_logger.setLevel(logging.INFO)
+    # config_logger.setLevel(logging.INFO)
+    time_logger = logging.getLogger("time_logger")
+    time_logger.setLevel(logging.INFO)
+    # time_logger.setLevel(logging.INFO)
+    # set up time handler
+    time_formatter = logging.Formatter('%(asctime)s:%(message)s')
+    time_handler = logging.FileHandler(time_logging_file)
+    time_handler.setLevel(logging.INFO)
+    time_handler.setFormatter(time_formatter)
+    stream_handler = logging.StreamHandler()
+    stream_handler.setLevel(logging.INFO)
+    stream_handler.setFormatter(time_formatter)
+    add_handler(time_logger, [time_handler, stream_handler])
+    # setup config handler
+    config_formatter = logging.Formatter('%(message)s')
+    config_handler = logging.FileHandler(config_logging_file)
+    config_handler.setLevel(logging.INFO)
+    config_handler.setFormatter(config_formatter)
+    config_logger.addHandler(config_handler)
+    return config_logger, time_logger
 
 
 class Trainer:
     def __init__(self,
-                 criterion,
                  real_train_dl,
-                 data_feature_shape,
                  device,
-                 checkpoint_dir='runs/web_18/checkpoint',
+                 checkpoint_dir='',
+                 time_logging_file='',
+                 config_logging_file='',
                  noise_dim=5,
                  sample_len=10,
+                 batch_size=100,
                  dis_lambda_gp=10,
                  attr_dis_lambda_gp=10,
                  g_attr_d_coe=1,
@@ -43,6 +65,7 @@ class Trainer:
                  attr_d_lr=0.0001,
                  attr_d_beta1=0.5
                  ):
+        self.config_logger, self.time_logger = setup_logging(time_logging_file, config_logging_file)
         # setup models
         if dis_type == 'TRANSFORMER':
             self.dis = TransformerDiscriminator(input_feature_shape=real_train_dl.dataset.data_feature_shape,
@@ -50,12 +73,13 @@ class Trainer:
         else:
             self.dis = Discriminator(real_train_dl.dataset.data_feature_shape,
                                      real_train_dl.dataset.data_attribute_shape)
+        self.config_logger.info("DISCRIMINATOR: {0}".format(self.dis))
         self.attr_dis = AttrDiscriminator(real_train_dl.dataset.data_attribute_shape)
+        self.config_logger.info("ATTRIBUTE DISCRIMINATOR: {0}".format(self.attr_dis))
         if gen_type == 'RNN':
             noise_dim = noise_dim
         else:
             noise_dim = att_dim - real_train_dl.dataset.data_attribute.shape[1]
-
         if gen_type == "RNN":
             self.gen = DoppelGANgerGeneratorRNN(noise_dim=noise_dim,
                                                 feature_outputs=real_train_dl.dataset.data_feature_outputs,
@@ -70,30 +94,44 @@ class Trainer:
                                                       real_attribute_mask=real_train_dl.dataset.real_attribute_mask,
                                                       device=device,
                                                       sample_len=sample_len, num_heads=num_heads, attn_dim=att_dim)
-
-        self.criterion = criterion
+        self.config_logger.info("GENERATOR: {0}".format(self.gen))
+        self.criterion = "Wasserstein GAN with Gradient Penalty"
+        self.config_logger.info("Criterion: {0}".format(self.criterion))
         # setup optimizer
         self.dis_opt = torch.optim.Adam(self.dis.parameters(), lr=d_lr, betas=(d_beta1, 0.999))
+        self.config_logger.info("DISCRIMINATOR OPTIMIZER: {0}".format(self.dis_opt))
         self.attr_dis_opt = torch.optim.Adam(self.attr_dis.parameters(), lr=attr_d_lr, betas=(attr_d_beta1, 0.999))
+        self.config_logger.info("ATTRIBUTE DISCRIMINATOR OPTIMIZER: {0}".format(self.attr_dis_opt))
         self.gen_opt = torch.optim.Adam(self.gen.parameters(), lr=g_lr, betas=(g_beta1, 0.999))
-
+        self.config_logger.info("GENERATOR OPTIMIZER: {0}".format(self.gen_opt))
         self.real_train_dl = real_train_dl
-        self.data_feature_shape = data_feature_shape
-        if data_feature_shape[1] % sample_len != 0:
+        self.data_feature_shape = self.real_train_dl.dataset.data_feature_shape
+        if self.data_feature_shape[1] % sample_len != 0:
             raise Exception("length must be a multiple of sample_len")
-        self.sample_time = int(data_feature_shape[1] / sample_len)
+        self.sample_time = int(self.data_feature_shape[1] / sample_len)
+        self.batch_size = batch_size
+        self.config_logger.info("Batch Size: {0}".format(self.batch_size))
         self.noise_dim = noise_dim
+        self.config_logger.info("Noise Dimension: {0}".format(self.noise_dim))
         self.sample_len = sample_len
+        self.config_logger.info("Sample_Length: {0}".format(self.sample_len))
         self.dis_lambda_gp = dis_lambda_gp
         self.attr_dis_lambda_gp = attr_dis_lambda_gp
         self.g_attr_d_coe = g_attr_d_coe
         self.d_rounds = d_rounds
         self.g_rounds = g_rounds
+        self.config_logger.info("d_rounds: {0}".format(self.d_rounds))
+        self.config_logger.info("g_rounds: {0}".format(self.g_rounds))
+        self.config_logger.info("d_lambda_gp_coefficient: {0}".format(self.dis_lambda_gp))
+        self.config_logger.info("attr_d_lambda_gp_coefficient: {0}".format(self.attr_dis_lambda_gp))
+        self.config_logger.info("g_attr_d_coe: {0}".format(self.g_attr_d_coe))
+
         self.checkpoint_dir = checkpoint_dir
         if not os.path.exists(checkpoint_dir):
             os.makedirs(checkpoint_dir)
         self.writer = SummaryWriter(checkpoint_dir)
         self.device = device
+        self.config_logger.info("device: {0}".format(self.device))
         self.dis = self.dis.to(self.device)
         self.attr_dis = self.attr_dis.to(self.device)
         self.gen = self.gen.to(self.device)
@@ -113,22 +151,21 @@ class Trainer:
         torch.save(self.attr_dis, "{0}/epoch_{1}/attr_discriminator.pth".format(self.checkpoint_dir, epoch))
         torch.save(self.gen, "{0}/epoch_{1}/generator.pth".format(self.checkpoint_dir, epoch))
 
-    def inference(self, data_attribute, epoch, model_dir=None):
+    def inference(self, epoch, model_dir=None):
         if model_dir is None:
             model_dir = "{0}/epoch_{1}".format(self.checkpoint_dir, epoch)
-        batch_size = data_attribute.shape[0]
-        rounds = self.data_feature_shape[0] // batch_size
-        sampled_features = np.zeros((0, self.data_feature_shape[1], self.data_feature_shape[2] - 2))
-        sampled_attributes = np.zeros((0, data_attribute.shape[1]))
-        sampled_gen_flags = np.zeros((0, self.data_feature_shape[1]))
+        batch_size = self.batch_size
+
+        while self.real_train_dl.dataset.data_attribute_shape[0] % batch_size != 0:
+            batch_size -= 1
+        rounds = self.real_train_dl.dataset.data_attribute_shape[0] // batch_size
+        sampled_features = np.zeros((0, self.real_train_dl.dataset.data_feature_shape[1],
+                                     self.real_train_dl.dataset.data_feature_shape[2]-2))
+        sampled_attributes = np.zeros((0, self.real_train_dl.dataset.data_attribute_shape[1]))
+        sampled_gen_flags = np.zeros((0, self.real_train_dl.dataset.data_feature_shape[1]))
         sampled_lengths = np.zeros(0)
         for i in range(rounds):
-            real_attribute_input_noise = self.gen_attribute_input_noise(batch_size).to(self.device)
-            addi_attribute_input_noise = self.gen_attribute_input_noise(batch_size).to(self.device)
-            feature_input_noise = self.gen_feature_input_noise(batch_size, self.sample_time).to(self.device)
-            features, attributes, gen_flags, lengths = self.sample_from(real_attribute_input_noise,
-                                                                        addi_attribute_input_noise,
-                                                                        feature_input_noise)
+            features, attributes, gen_flags, lengths = self.sample_from(batch_size=batch_size)
             sampled_features = np.concatenate((sampled_features, features), axis=0)
             sampled_attributes = np.concatenate((sampled_attributes, attributes), axis=0)
             sampled_gen_flags = np.concatenate((sampled_gen_flags, gen_flags), axis=0)
@@ -319,11 +356,6 @@ class Trainer:
                     fake_attribute, fake_feature = self.gen(real_attribute_noise,
                                                             addi_attribute_noise,
                                                             feature_input_noise)
-                    # calculate mmd
-                    # for i in range(len(data_feature)):
-                    #     mmd.append(
-                    #         calculate_mmd_rbf(fake_feature[i, :, :].detach().cpu().numpy(),
-                    #                           data_feature[i, :, :].detach().cpu().numpy()))
                     mmd.append(calculate_mmd_rbf(torch.mean(fake_feature, dim=0).detach().cpu().numpy(),
                                                  torch.mean(data_feature, dim=0).detach().cpu().numpy()))
                     # discriminator
@@ -397,11 +429,12 @@ class Trainer:
                         running_losses = self.add_losses(running_losses, writer_frequency, epoch, n_total_steps,
                                                          batch_idx)
 
-            time_logger.info('END OF EPOCH {0}'.format(epoch))
+
+            self.time_logger.info('END OF EPOCH {0}'.format(epoch))
             avg_mmd.append(np.asarray(mmd).mean())
             # save model
             if epoch % saver_frequency == 0:
                 self.save(epoch)
-                # self.inference(data_attribute, epoch)
+                self.inference(epoch)
         np.save("{}/mmd.npy".format(self.checkpoint_dir), np.asarray(avg_mmd))
         self.writer.close()
