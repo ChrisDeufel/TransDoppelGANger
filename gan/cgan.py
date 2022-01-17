@@ -35,7 +35,7 @@ class CGANGenerator(nn.Module):
 
 
 class CGANDiscriminator(nn.Module):
-    def __init__(self, input_feature_shape, input_attribute_shape, num_units=200, num_layers=3,
+    def __init__(self, input_feature_shape, input_attribute_shape, num_units=100, num_layers=3,
                  alpha=0.1, **kwargs):
         # Defaults
         super().__init__()

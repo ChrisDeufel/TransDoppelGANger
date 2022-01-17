@@ -131,7 +131,7 @@ class Trainer:
             os.makedirs(checkpoint_dir)
         self.writer = SummaryWriter(checkpoint_dir)
         self.device = device
-        self.config_logger.info("device: {0}".format(self.device))
+        self.config_logger.info("Device: {0}".format(self.device))
         self.dis = self.dis.to(self.device)
         self.attr_dis = self.attr_dis.to(self.device)
         self.gen = self.gen.to(self.device)
