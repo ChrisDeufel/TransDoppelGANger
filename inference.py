@@ -71,7 +71,7 @@ for n in range(1, 2, 1):
         if gan_type == "RNN" or gan_type == "TRANSFORMER":
             trainer = Trainer(criterion=None,
                               real_train_dl=real_train_dl, data_feature_shape=data_feature_shape, device=device,
-                              noise_dim=noise_dim, sample_len=sample_len, gan_type=gan_type, att_dim=attn_dim,
+                              noise_dim=noise_dim, sample_len=sample_len, gen_type=gan_type, att_dim=attn_dim,
                               num_heads=num_heads, g_lr=g_lr, g_beta1=g_beta1, d_lr=d_lr, d_beta1=d_beta1,
                               attr_d_lr=attr_d_lr, attr_d_beta1=attr_d_beta1
                               )

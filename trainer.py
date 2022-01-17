@@ -5,7 +5,8 @@ from torch.utils.tensorboard import SummaryWriter
 import os
 import logging
 from loss_util import gradient_penalty
-from gan.network import AttrDiscriminator, Discriminator, DoppelGANgerGeneratorRNN, DoppelGANgerGeneratorAttention
+from gan.network import AttrDiscriminator, Discriminator, DoppelGANgerGeneratorRNN, DoppelGANgerGeneratorAttention, \
+    TransformerDiscriminator
 from util import calculate_mmd_rbf
 
 time_logger = logging.getLogger(__name__)
@@ -31,7 +32,8 @@ class Trainer:
                  g_attr_d_coe=1,
                  d_rounds=1,
                  g_rounds=1,
-                 gan_type='RNN',
+                 gen_type='RNN',
+                 dis_type='normal',
                  att_dim=100,
                  num_heads=10,
                  g_lr=0.0001,
@@ -42,14 +44,19 @@ class Trainer:
                  attr_d_beta1=0.5
                  ):
         # setup models
-        self.dis = Discriminator(real_train_dl.dataset.data_feature_shape, real_train_dl.dataset.data_attribute_shape)
+        if dis_type == 'TRANSFORMER':
+            self.dis = TransformerDiscriminator(input_feature_shape=real_train_dl.dataset.data_feature_shape,
+                                                input_attribute_shape=real_train_dl.dataset.data_attribute_shape)
+        else:
+            self.dis = Discriminator(real_train_dl.dataset.data_feature_shape,
+                                     real_train_dl.dataset.data_attribute_shape)
         self.attr_dis = AttrDiscriminator(real_train_dl.dataset.data_attribute_shape)
-        if gan_type == 'RNN':
+        if gen_type == 'RNN':
             noise_dim = noise_dim
         else:
             noise_dim = att_dim - real_train_dl.dataset.data_attribute.shape[1]
 
-        if gan_type == "RNN":
+        if gen_type == "RNN":
             self.gen = DoppelGANgerGeneratorRNN(noise_dim=noise_dim,
                                                 feature_outputs=real_train_dl.dataset.data_feature_outputs,
                                                 attribute_outputs=real_train_dl.dataset.data_attribute_outputs,

@@ -13,11 +13,12 @@ device = "cuda" if torch.cuda.is_available() else "cpu"
 # device = "cpu"
 dataset = "index_growth_1mo"
 gan_type = 'RNN'
-checkpoint_dir = 'runs/{}/{}/test_2/checkpoint'.format(dataset, gan_type)
+dis_type = 'normal'
+checkpoint_dir = 'runs/{}/{}_Dis{}/test/checkpoint'.format(dataset, gan_type, dis_type)
 if not os.path.exists(checkpoint_dir):
     os.makedirs(checkpoint_dir)
-time_logging_file = 'runs/{}/{}/test_2/time.log'.format(dataset, gan_type)
-config_logging_file = 'runs/{}/{}/test_2/config.log'.format(dataset, gan_type)
+time_logging_file = 'runs/{}/{}_Dis{}/test/time.log'.format(dataset, gan_type, dis_type)
+config_logging_file = 'runs/{}/{}_Dis{}/test/config.log'.format(dataset, gan_type, dis_type)
 # SET UP LOGGING
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
@@ -38,7 +39,7 @@ config_handler.setFormatter(config_formatter)
 logger.addHandler(config_handler)
 
 sample_len = 1
-batch_size = 20
+batch_size = 100
 attn_dim = 100
 # load data
 if dataset == "transactions":
@@ -101,7 +102,7 @@ logger.info("g_attr_d_coe: {0}".format(g_attr_d_coe))
 
 trainer = Trainer(criterion=None, real_train_dl=real_train_dl, data_feature_shape=data_feature_shape, device=device,
                   checkpoint_dir=checkpoint_dir, noise_dim=noise_dim,
-                  sample_len=sample_len, d_rounds=d_rounds, g_rounds=g_rounds, gan_type=gan_type,
+                  sample_len=sample_len, d_rounds=d_rounds, g_rounds=g_rounds, gen_type=gan_type, dis_type=dis_type,
                   att_dim=attn_dim, num_heads=num_heads, g_lr=g_lr, g_beta1=g_beta1, d_lr=d_lr,
                   d_beta1=d_beta1, attr_d_lr=attr_d_lr, attr_d_beta1=attr_d_beta1)
 trainer.train(epochs=epoch, writer_frequency=1, saver_frequency=20)

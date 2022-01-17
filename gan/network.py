@@ -10,35 +10,39 @@ from gan.modules import MultiHeadAttention
 
 # torch.utils.backcompat.broadcast_warning.enabled = True
 # Transformer Discriminator
-"""
+
 class TransformerDiscriminator(nn.Module):
-    def __init__(self, input_feature_shape, input_attribute_shape, num_heads=5, attn_dim=200,
-                 scope_name="transformer_discriminator", *args, **kwargs):
+    def __init__(self, input_feature_shape, input_attribute_shape, num_units=200, num_heads=1, scope_name="transformer_discriminator", *args, **kwargs):
         super(TransformerDiscriminator, self).__init__()
         self.scope_name = scope_name
         # only saved for adding to summary writer (see trainer.train)
         self.input_feature_shape = input_feature_shape
         self.input_attribute_shape = input_attribute_shape
-        self.input_size = input_feature_shape[1] * input_feature_shape[2] + input_attribute_shape[1]
-        self.positional_encoding = PositionalEncoding(d_model=)
-        self.decoder = torch.nn.TransformerDecoderLayer(d_model=attn_dim, nhead=num_heads, dim_feedforward=attn_dim,
-                                                        batch_first=True)
-        modules = [nn.Linear(self.input_size, num_units), nn.ReLU()]
-        for i in range(num_layers - 2):
-            modules.append(nn.Linear(num_units, num_units))
-            modules.append(nn.ReLU())
-        modules.append(nn.Linear(num_units, 1))
+        self.num_features = input_feature_shape[2]
+        self.positional_encoding = PositionalEncoding(d_model=self.num_features)
+        #self.decoder = torch.nn.TransformerDecoderLayer(d_model=attn_dim, nhead=num_heads, dim_feedforward=attn_dim,
+        #                                                batch_first=True)
+        self.encoder = torch.nn.TransformerEncoderLayer(d_model=self.num_features, nhead=num_heads,
+                                                        dim_feedforward=num_units, batch_first=True)
+        self.input_ff = input_feature_shape[1] * input_feature_shape[2] + input_attribute_shape[1]
+        modules = [nn.Linear(self.input_ff, num_units), nn.ReLU(),
+                   nn.Linear(num_units, 1)]
         # https://discuss.pytorch.org/t/append-for-nn-sequential-or-directly-converting-nn-modulelist-to-nn-sequential/7104
         self.disc = nn.Sequential(*modules)
         # initialize weights
         self.disc.apply(init_weights)
 
     def forward(self, input_feature, input_attribute):
-        input_feature = torch.flatten(input_feature, start_dim=1, end_dim=2)
-        input_attribute = torch.flatten(input_attribute, start_dim=1, end_dim=1)
-        x = torch.cat((input_feature, input_attribute), dim=1)
+        input_feature = input_feature.transpose(1, 0)
+        input_feature = self.positional_encoding(input_feature)
+        input_feature = input_feature.transpose(1, 0)
+        # TODO: generate Attention Mask
+        transformer_output = self.encoder(input_feature)
+        transformer_output = torch.flatten(transformer_output, start_dim=1, end_dim=2)
+        #input_attribute = torch.flatten(input_attribute, start_dim=1, end_dim=1)
+        x = torch.cat((input_attribute, transformer_output), dim=1)
         return self.disc(x)
-"""
+
 
 # Discriminator
 class Discriminator(nn.Module):
@@ -68,7 +72,8 @@ class Discriminator(nn.Module):
 
 
 class AttrDiscriminator(nn.Module):
-    def __init__(self, input_attribute_shape, num_layers=5, num_units=200, scope_name="attrDiscriminator", *args, **kwargs):
+    def __init__(self, input_attribute_shape, num_layers=5, num_units=200, scope_name="attrDiscriminator", *args,
+                 **kwargs):
         super(AttrDiscriminator, self).__init__()
         self.scope_name = scope_name
         # only saved for adding to summary writer (see trainer.train)
