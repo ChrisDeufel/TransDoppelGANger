@@ -3,7 +3,7 @@ import torch
 import numpy as np
 from trainer import Trainer
 from trainer_RCGAN import RCGAN
-from trainer_timeGAN import TimeGAN
+from trainer_timeGAN_original import TimeGAN
 from trainer_CGAN import CGAN
 from data import Data, LargeData, SplitData, TimeGanData
 

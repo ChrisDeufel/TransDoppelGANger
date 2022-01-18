@@ -275,6 +275,7 @@ def pearson(x, y):
 # calculate and plot cdf from list
 def plot_cdf(data, file, normalization):
     fig, axes = plt.subplots(1, 1, figsize=(12, 8))
+    pdf = None
     for set in data:
         pdf = set['pdf']
         Y = np.cumsum(pdf)
@@ -284,6 +285,13 @@ def plot_cdf(data, file, normalization):
             X = np.linspace(0, 1, pdf.shape[0])
         axes.plot(X, Y, color=set['color'], label=set['name'])
     axes.legend()
+    if normalization is not None:
+        x_ticks = range(0, len(pdf) + 1, int(len(pdf) / 4))
+        if normalization == output.Normalization.ZERO_ONE:
+            x_labels = ['0', '0.25', '0.5', '0.75', '1']
+        else:
+            x_labels = ['-1', '-0.5', '0', '0.5', '1']
+        plt.xticks(x_ticks, x_labels)
     axes.set_title("CDF")
     plt.savefig('{0}.png'.format(file))
 
@@ -331,13 +339,13 @@ def cross_measurement(dir, data, nr_bins):
                     else:
                         bin = int((pear + 1) * (nr_bins / 2))
                         pearsons[bin] += 1
-                pearsons /= data_feature.shape[0]
+                # pearsons /= data_feature.shape[0]
                 data_to_plot.append({"pdf": pearsons, 'name': set['name'], 'color': set['color']})
             file = "{0}/feature{1}_feature{2}".format(dir, f_1, f_2)
             if not os.path.exists(file):
                 os.makedirs(file)
             file = "{0}/{1}".format(file, epoch)
-            plot_cdf(data=data_to_plot, file=file)
+            plot_cdf(data=data_to_plot, file=file, normalization=output.Normalization.MINUSONE_ONE)
 
 
 ### PLOT MEASUREMENT DISTRIBUTION OR METADATA DISTRIBUTION ###
@@ -691,11 +699,19 @@ def mse_autocorrelation(dir, real_data_features, sample_data_features, data_feat
 
 
 # load web dataset for testing
-dataset_name = 'index_growth_1mo'
-gan_type = 'RGAN'
+dataset_name = 'index_growth_range_3mo'
+gan_type = 'Gen_RNN_Dis_normal'
 # load original data
 (data_feature, data_attribute, data_gen_flag, data_feature_outputs, data_attribute_outputs) = \
     load_data("data/{0}".format(dataset_name))
+datasets = [
+            {'name': "index_growth_1mo", 'auto': [(15, False), (8, True)]},
+            {'name': "index_growth_3mo", 'auto': [(50, False), (20, True)]},
+            {'name': "index_growth_12mo", 'auto': [(200, False), (150, True)]},
+            {'name': "index_growth_range_1mo", 'auto': [(15, False), (8, True)]},
+            {'name': "index_growth_range_3mo", 'auto': [(50, False), (20, True)]},
+            {'name': "index_growth_range_12mo", 'auto': [(200, False), (150, True)]}
+            ]
 
 # if normalization needed
 (data_feature, data_attribute, data_attribute_outputs, real_attribute_mask) = \
@@ -740,11 +756,11 @@ for i in range(1, 2):
         # call methods
         # metadata_distribution(dir=evaluation_dir, data=data, attribute_output=data_attribute_outputs)
         # sequence_length(dir=evaluation_dir, data=data)
-        # cross_measurement(dir=evaluation_dir, data=data, nr_bins=100)
+        cross_measurement(dir=evaluation_dir, data=data, nr_bins=100)
         # measurement_distribution(dir=evaluation_dir, data=data, feature_output=data_feature_outputs)
         # emd(dir=evaluation_dir, data=data, data_feature_output=data_feature_outputs)
-        autocorrelation(dir=evaluation_dir, data=data, data_feature_output=data_feature_outputs, n_lags=8,
-                        partial=True)
+        # autocorrelation(dir=evaluation_dir, data=data, data_feature_output=data_feature_outputs, n_lags=8,
+        #                 partial=True)
         # nearest_neighbors(dir=evaluation_dir, real_data_features=data_feature, sampled_data_features=sampled_features,
         #                   data_feature_outputs=data_feature_outputs)
         # meta_meas_corr(dir=evaluation_dir, data=data, data_attribute_outputs=data_attribute_outputs,

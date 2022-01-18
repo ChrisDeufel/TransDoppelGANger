@@ -11,14 +11,14 @@ import numpy as np
 
 # device = "cuda" if torch.cuda.is_available() else "cpu"
 device = "cpu"
-dataset = "index_growth_1mo"
+dataset = "FCC_MBA"
 gan_type = 'RNN'
 dis_type = 'normal'
-checkpoint_dir = 'runs/{}/{}_Dis{}/test/checkpoint'.format(dataset, gan_type, dis_type)
+checkpoint_dir = 'runs/{}/Gen_{}_Dis_{}/test/checkpoint'.format(dataset, gan_type, dis_type)
 if not os.path.exists(checkpoint_dir):
     os.makedirs(checkpoint_dir)
-time_logging_file = 'runs/{}/{}_Dis{}/test/time.log'.format(dataset, gan_type, dis_type)
-config_logging_file = 'runs/{}/{}_Dis{}/test/config.log'.format(dataset, gan_type, dis_type)
+time_logging_file = 'runs/{}/Gen_{}_Dis_{}/test/time.log'.format(dataset, gan_type, dis_type)
+config_logging_file = 'runs/{}/Gen_{}_Dis_{}/test/config.log'.format(dataset, gan_type, dis_type)
 
 sample_len = 1
 batch_size = 100
