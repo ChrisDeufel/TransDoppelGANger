@@ -24,6 +24,7 @@ import torch.optim as optim
 from gan.timegan import Encoder, Recovery, Generator, Discriminator, Supervisor
 from gan.gan_util import gen_noise
 import logging
+from util import calculate_mmd_rbf
 
 
 def add_handler(logger, handlers):
@@ -72,7 +73,7 @@ class TimeGAN:
                  z_dim=6,
                  hidden_dim=24,
                  num_layer=3,
-                 beta1=0.5,
+                 beta1=0.9,
                  w_gamma=1,
                  w_es=0.1,
                  w_e0=10,
@@ -123,11 +124,9 @@ class TimeGAN:
         self.config_logger.info("GENERATOR: {0}".format(self.netg))
         self.config_logger.info("SUPERVISOR: {0}".format(self.nets))
 
-        self.config_logger.info("EMBEDDER OPTIMIZER: {0}".format(self.optimizer_er))
-        self.config_logger.info("RECOVERY OPTIMIZER: {0}".format(self.optimizer_r))
+        self.config_logger.info("EMBEDDER / RECOVERY OPTIMIZER: {0}".format(self.optimizer_er))
         self.config_logger.info("DISCRIMINATOR OPTIMIZER: {0}".format(self.optimizer_d))
-        self.config_logger.info("GENERATOR OPTIMIZER: {0}".format(self.optimizer_gs))
-        self.config_logger.info("SUPERVISOR OPTIMIZER: {0}".format(self.optimizer_s))
+        self.config_logger.info("GENERATOR / SUPERVISOR OPTIMIZER: {0}".format(self.optimizer_gs))
 
         self.config_logger.info("Reconstruction Loss: {0}".format(self.l_mse))
         self.config_logger.info("Unsupervised Loss: {0}".format(self.l_mse))
@@ -191,7 +190,7 @@ class TimeGAN:
 
     def sample_from(self, batch_size, return_gen_flag_feature=False):
         ## Synthetic data generation
-        Z = gen_noise((batch_size, self.real_train_dl.dataset.data_feature_shape[1], self.z_dim))
+        Z = gen_noise((batch_size, self.real_train_dl.dataset.data_feature_shape[1], self.z_dim)).to(self.device)
         E_hat = self.netg(Z)  # [?, 24, 24]
         H_hat = self.nets(E_hat)  # [?, 24, 24]
         features = self.netr(H_hat)  # [?, 24, 24]
@@ -233,10 +232,6 @@ class TimeGAN:
     def train_one_iter_er_2(self, data_feature):
         """ Train the model for one epoch.
         """
-        self.nete.train()
-        self.netr.train()
-        self.netg.eval()
-        self.nets.eval()
         X = data_feature
         # Forward-pass
         H = self.nete(X)
@@ -257,8 +252,6 @@ class TimeGAN:
     def train_one_iter_s(self, data_feature):
         """ Train the model for one epoch.
         """
-        self.nete.eval()
-        self.nets.train()
         # set mini-batch
         X = data_feature
         # Forward-pass
@@ -274,14 +267,10 @@ class TimeGAN:
         """ Train the model for one epoch.
         """
         self.batch_size = data_feature.shape[0]
-        self.netr.eval()
-        self.nets.train()
-        self.netd.eval()
-        self.netg.train()
 
         # set mini-batch
         X = data_feature
-        Z = gen_noise((self.batch_size, data_feature.shape[1], self.z_dim))
+        Z = gen_noise((self.batch_size, data_feature.shape[1], self.z_dim)).to(self.device)
         # Forward-pass
         H = self.nete(X)
         H_supervise = self.nets(H)
@@ -311,15 +300,9 @@ class TimeGAN:
     def train_one_iter_d(self, data_feature):
         """ Train the model for one epoch.
         """
-        self.nete.eval()
-        self.netr.eval()
-        self.nets.eval()
-        self.netg.eval()
-        self.netd.train()
-
         # set mini-batch
         X = data_feature
-        Z = gen_noise((self.batch_size, data_feature.shape[1], self.z_dim))
+        Z = gen_noise((self.batch_size, data_feature.shape[1], self.z_dim)).to(self.device)
 
         # train superviser
         # forward pass
@@ -337,13 +320,26 @@ class TimeGAN:
         err_d_fake = self.l_bce(torch.ones_like(Y_fake), Y_fake)
         err_d_fake_e = self.l_bce(torch.ones_like(Y_fake_e), Y_fake_e)
         err_d = err_d_real + err_d_fake + err_d_fake_e * self.w_gamma
-        if self.err_d > 0.15:
+        if err_d > 0.15:
             err_d.backward(retain_graph=True)
         self.optimizer_d.step()
+
+    def generate_fake_feature(self, Z):
+        self.netg.eval()
+        self.nets.eval()
+        self.netr.eval()
+        E_hat = self.netg(Z)
+        H_hat = self.nets(E_hat)
+        return self.netr(H_hat)
 
     def train(self, epochs, saver_frequency=10):
         """ Train the model
         """
+        self.nete.train()
+        self.netr.train()
+        self.netg.train()
+        self.netd.train()
+        self.nets.train()
         self.time_logger.info('Start Embedding Network Training')
         for iter in range(epochs):
             for batch_idx, (data_attribute, data_feature) in enumerate(self.real_train_dl):
@@ -361,9 +357,23 @@ class TimeGAN:
         self.time_logger.info('Finish Training with Supervised Loss Only')
 
         self.time_logger.info('Start Joint Training')
+        avg_mmd = []
         for iter in range(epochs):
+            mmd = []
             for batch_idx, (data_attribute, data_feature) in enumerate(self.real_train_dl):
                 data_feature = data_feature.to(self.device)
+                print(data_feature)
+                Z = gen_noise((data_feature.shape[0], data_feature.shape[1], self.z_dim)).to(self.device)
+                fake_feature = self.generate_fake_feature(Z)
+                print(data_feature.shape)
+                print(fake_feature.shape)
+                mmd.append(calculate_mmd_rbf(torch.mean(fake_feature, dim=0).detach().cpu().numpy(),
+                                            torch.mean(data_feature, dim=0).detach().cpu().numpy()))
+                self.nete.train()
+                self.netr.train()
+                self.netg.train()
+                self.netd.train()
+                self.nets.train()
                 for kk in range(2):
                     # Train Generator and Supervisor
                     self.train_one_iter_g(data_feature)
@@ -372,5 +382,12 @@ class TimeGAN:
                 self.train_one_iter_d(data_feature)
             self.time_logger.info('Joint Training - END OF EPOCH {0}'.format(iter))
             if iter % saver_frequency == 0:
+                self.nete.train()
+                self.netr.train()
+                self.netg.train()
+                self.netd.train()
+                self.nets.train()
                 self.save(iter)
+                self.inference(iter)
+        np.save("{}/mmd.npy".format(self.checkpoint_dir), np.asarray(avg_mmd))
         self.time_logger.info('Finish Joint Training')

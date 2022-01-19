@@ -57,5 +57,4 @@ class CGANDiscriminator(nn.Module):
         self.disc.apply(init_weights)
 
     def forward(self, x):
-        x = self.disc(x)
-        return torch.sigmoid(x)
+        return self.disc(x)

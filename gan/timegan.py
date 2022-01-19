@@ -153,7 +153,7 @@ class Discriminator(nn.Module):
 
     def __init__(self, hidden_dim=24, num_layer=3):
         super(Discriminator, self).__init__()
-        self.rnn = nn.GRU(input_size=hidden_dim, hidden_size=hidden_dim, num_layers=num_layer, bidirectional=True)
+        self.rnn = nn.GRU(input_size=hidden_dim, hidden_size=int(hidden_dim/2), num_layers=num_layer, bidirectional=True)
         self.fc = nn.Linear(hidden_dim, 1)
         self.sigmoid = nn.Sigmoid()
         self.apply(_weights_init)
@@ -162,5 +162,5 @@ class Discriminator(nn.Module):
         d_outputs, _ = self.rnn(input)
         Y_hat = self.fc(d_outputs)
         if sigmoid:
-            Y_hat = self.igmoid(Y_hat)
+            Y_hat = self.sigmoid(Y_hat)
         return Y_hat
