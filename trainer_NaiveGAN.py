@@ -174,7 +174,7 @@ class NAIVEGAN:
                                                         self.real_train_dl.dataset.data_feature_shape[1],
                                                         self.real_train_dl.dataset.data_feature_shape[2]))
                 mmd.append(calculate_mmd_rbf(torch.mean(mmd_fake, dim=0).detach().cpu().numpy(),
-                                             torch.mean(mmd_fake, dim=0).detach().cpu().numpy()))
+                                             torch.mean(mmd_real, dim=0).detach().cpu().numpy()))
                 # fake = torch.cat((data_attribute, fake), dim=1)
                 disc_real = self.discriminator(data_feature).view(-1)
                 lossD_real = self.criterion(disc_real, torch.ones_like(disc_real))

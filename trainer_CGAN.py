@@ -57,7 +57,7 @@ class CGAN:
                  num_layers=3,
                  beta1=0.5,
                  alpha=0.1,
-                 checkpoint_dir="",
+                 checkpoint_dir='',
                  time_logging_file='',
                  config_logging_file='',
                  isWasserstein=True):

@@ -22,6 +22,7 @@ def main():
     config_logging_file = 'runs/{}/{}/1/config.log'.format(dataset_name, gan_type)
 
     real_train_dl = DataLoader(dataset=dataset, batch_size=batch_size, shuffle=True)
+    print(len(real_train_dl))
     trainer = TimeGAN(real_train_dl, device=device, checkpoint_dir=checkpoint_dir,
                       config_logging_file=config_logging_file,
                       time_logging_file=time_logging_file)

@@ -10,7 +10,8 @@ import copy
 
 
 class Data(Dataset):
-    def __init__(self, sample_len, transforms=None, normalize=True, gen_flag=True, size=None, name='web'):
+    def __init__(self, sample_len, transforms=None, normalize=True, gen_flag=True, size=None, name='web',
+                 w_lambert=True, ks=3):
         (self.data_feature, self.data_attribute, self.data_gen_flag,
          self.data_feature_outputs, self.data_attribute_outputs) = load_data("data/{0}".format(name))
         self.transforms = transforms
@@ -25,7 +26,7 @@ class Data(Dataset):
             (self.data_feature, self.data_attribute, self.data_attribute_outputs,
              self.real_attribute_mask) = normalize_per_sample(self.data_feature, self.data_attribute,
                                                               self.data_feature_outputs, self.data_attribute_outputs,
-                                                              self.data_gen_flag)
+                                                              self.data_gen_flag, w_lambert=w_lambert, ks=ks)
 
         if gen_flag:
             self.data_feature, self.data_feature_outputs = add_gen_flag(self.data_feature, self.data_gen_flag,

@@ -6,10 +6,27 @@ import pickle
 from torch.distributions.multivariate_normal import MultivariateNormal
 import torch
 from sklearn import metrics
+from scipy.special import lambertw
+#from mpmath import lambertw
 
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import logging
+import argparse
+
+def options_parser():
+    parser = argparse.ArgumentParser(description='Train a GAN to generate sequential, real-valued data.')
+    parser.add_argument('-d', '--dataset', help='name of dataset', type=str, default='FCC_MBA')
+    parser.add_argument('-wl', '--w_lambert', help='data should be w lambert transformed', type=bool, default=False)
+    parser.add_argument('-ks', '--kernel_smoothing', help='window size for kernel smoothing', type=str, default=None)
+    parser.add_argument('-gt', '--gan_type', help='name of GAN', type=str, default='RNN')
+    parser.add_argument('-dt', '--dis_type', help='discriminator type', type=str, default='normal')
+    parser.add_argument('-sl', '--sample_len', help='sample length for DoppelGANger', type=int, default=1)
+    parser.add_argument('-bs', '--batch_size', help='Minibatch size', type=int, default=20)
+    parser.add_argument('-nd', '--noise_dim', help='Dimension of random Input Noise', type=int, default=20)
+    parser.add_argument('-ep', '--num_epochs', help='Number of Epochs to train', type=int, default=401)
+    parser.add_argument('-ic', '--is_conditional', help='For RC GAN', type=bool, default=True)
+    return parser
 
 
 def add_handler(handlers, logger):
@@ -154,9 +171,20 @@ def renormalize_per_sample(data_feature, data_attribute, data_feature_outputs,
 
     return data_feature, data_attribute
 
+def kernel_smoothing(x, ks):
+    y = np.zeros_like(x)
+    for i in range(len(x)):
+        if i - int(ks / 2) < 0:
+            y[i] = np.mean(x[:ks])
+        elif i + int(ks / 2) > (len(x) - 1):
+            y[i] = np.mean(x[-ks:])
+        else:
+            y[i] = np.mean(x[i - int(ks / 2):i + int(ks / 2)])
+    return y
+
 
 def normalize_per_sample(data_feature, data_attribute, data_feature_outputs,
-                         data_attribute_outputs, data_gen_flag, eps=0.001):
+                         data_attribute_outputs, data_gen_flag, eps=0.0001, w_lambert=True, ks=None):
     # assume all samples have maximum length
     data_feature_min = np.zeros((data_feature.shape[0], data_feature.shape[2]))
     data_feature_max = np.zeros((data_feature.shape[0], data_feature.shape[2]))
@@ -182,7 +210,7 @@ def normalize_per_sample(data_feature, data_attribute, data_feature_outputs,
                 additional_attribute_outputs.append(Output(
                     type_=OutputType.CONTINUOUS,
                     dim=1,
-                    normalization=output.normalization,
+                    normalization=Normalization.MINUSONE_ONE,
                     is_gen_flag=False))
                 additional_attribute_outputs.append(Output(
                     type_=OutputType.CONTINUOUS,
@@ -211,10 +239,16 @@ def normalize_per_sample(data_feature, data_attribute, data_feature_outputs,
         [data_attribute, additional_attribute], axis=1)
     data_attribute_outputs.extend(additional_attribute_outputs)
 
+
+    if w_lambert:
+        data_feature = lambertw(data_feature).real
+    if ks is not None:
+        for i in range(len(data_feature)):
+            for d in range(data_feature.shape[2]):
+                data_feature[i, :, d] = kernel_smoothing(data_feature[i, :, d], ks)
     for i in range(len(data_feature)):
         len_feature = np.count_nonzero(data_gen_flag[i, :])
         data_feature[i, len_feature:, :] = 0
-
     return data_feature, data_attribute, data_attribute_outputs, \
            real_attribute_mask
 

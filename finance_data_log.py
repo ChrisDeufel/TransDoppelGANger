@@ -6,9 +6,7 @@ import pickle
 import datetime
 import numpy as np
 import logging
-# from evaluation import measurement_distribution, autocorrelation
-import matplotlib.pyplot as plt
-from scipy.special import lambertw
+from evaluation import measurement_distribution, autocorrelation
 
 
 def calc_decade(year):
@@ -21,16 +19,16 @@ def calc_decade(year):
 
 
 measurement = "growth"
-log = False
-normalize_growth = "minusone_one"
-normalize_range = "zero_one"
-normalization = False
+log = True
+norm = "mean"
 add_range = True
 
 ################# ATTRIBUTES #################
 data_attribute_outputs = []
 continent = ["Rest of the World", "North America", "Europe", "Asia"]  # [0, 1, 2, 3]
 data_attribute_outputs.append(Output(type_=OutputType.DISCRETE, dim=len(continent), normalization=None))
+# quarter = [0, 1, 2, 3]
+# data_attribute_outputs.append(Output(type_=OutputType.DISCRETE, dim=len(quarter), normalization=None))
 decade = ["90s", "00s", "10s"]  # [0, 1, 2]
 data_attribute_outputs.append(Output(type_=OutputType.DISCRETE, dim=len(decade), normalization=None))
 ################# FEATURES #################
@@ -59,8 +57,7 @@ for feat in data_feature_outputs:
     feat_range += feat.dim
 data_feature = np.zeros((0, max_seq_len, feat_range))
 data_gen_flag = np.zeros((0, max_seq_len))
-indices = [{"ticker": "^GSPC", "continent": 1, "country": "USA"}]
-"""
+
 indices = [{"ticker": "^GSPC", "continent": 1, "country": "USA"},
            {"ticker": "^FTSE", "continent": 2, "country": "UK"},
            {"ticker": "^N225", "continent": 3, "country": "JAPAN"},
@@ -100,7 +97,7 @@ indices = [{"ticker": "^GSPC", "continent": 1, "country": "USA"},
            {"ticker": "AW01.FGI", "continent": 0, "country": "ROW"},
            {"ticker": "^W5000", "continent": 1, "country": "US"}
            ]
-"""
+
 path = "data/index_{}".format(measurement)
 if add_range:
     path = "{}_range_{}mo".format(path, str(m_intervall))
@@ -108,8 +105,8 @@ else:
     path = "{}_{}mo".format(path, str(m_intervall))
 if log:
     path = "{}_log".format(path)
-if normalization:
-    path = "{}_{}_norm".format(path, normalize_growth)
+if norm is not None:
+    path = "{}_{}_norm".format(path, norm)
 if not os.path.exists(path):
     os.makedirs(path)
 f = open("{}/description.txt".format(path), "a")
@@ -143,46 +140,18 @@ for index in indices:
             if len(raw_data) < (max_seq_len / 2):
                 continue
             raw_data['Open'] = raw_data['Open'].fillna(method='ffill')
-            raw_data['Close'] = raw_data['Close'].fillna(method='ffill')
-            raw_data['High'] = raw_data['High'].fillna(method='ffill')
-            raw_data['Low'] = raw_data['Low'].fillna(method='ffill')
-            raw_data['Growth'] = raw_data['Close'] / raw_data['Open']
-            # check for equality
-            if raw_data['Open'].equals(raw_data['Close']):
-                continue
+            raw_data['Growth'] = ((raw_data['Close'] - raw_data['Open']) / raw_data['Open'])
             if log:
                 raw_data['Growth'] = np.log(raw_data['Growth'])
             # https://stackoverflow.com/questions/26414913/normalize-columns-of-pandas-data-frame
-
-            if normalize_growth == "mean":
-                raw_data['Growth_norm'] = (raw_data['Growth'] - raw_data['Growth'].mean()) / raw_data['Growth'].std()
-            elif normalize_growth == 'minusone_one':
-                raw_data['Growth_norm'] = 2 * ((raw_data['Growth'] - raw_data['Growth'].min()) / (
-                        raw_data['Growth'].max() - raw_data['Growth'].min())) - 1
-            elif normalize_growth == 'zero_one':
-                raw_data['Growth_norm'] = (raw_data['Growth'] - raw_data['Growth'].min()) / (
-                        raw_data['Growth'].max() - raw_data['Growth'].min())
-            else:
-                raw_data['Growth_norm'] = (raw_data['Growth'] - raw_data['Growth'].min()) / (
-                        raw_data['Growth'].max() - raw_data['Growth'].min())
-
+            if norm is not None:
+                if norm == 'mean':
+                    raw_data['Growth'] = (raw_data['Growth'] - raw_data['Growth'].mean()) / raw_data['Growth'].std()
+                else:
+                    raw_data['Growth'] = (raw_data['Growth'] - raw_data['Growth'].min()) / (
+                                raw_data['Growth'].max() - raw_data['Growth'].min())
             raw_data['Range'] = raw_data['High'] - raw_data['Low']
 
-            if normalize_range == "mean":
-                raw_data['Range_norm'] = (raw_data['Range'] - raw_data['Range'].mean()) / raw_data['Range'].std()
-            elif normalize_range == 'minusone_one':
-                raw_data['Range_norm'] = 2 * ((raw_data['Range'] - raw_data['Range'].min()) / (
-                        raw_data['Range'].max() - raw_data['Range'].min())) - 1
-            elif normalize_range == 'zero_one':
-                raw_data['Range_norm'] = (raw_data['Range'] - raw_data['Range'].min()) / (
-                        raw_data['Range'].max() - raw_data['Range'].min())
-            else:
-                raw_data['Range_norm'] = (raw_data['Range'] - raw_data['Range'].min()) / (
-                        raw_data['Range'].max() - raw_data['Range'].min())
-            if raw_data['Growth_norm'].isnull().values.any():
-                continue
-            if add_range and raw_data['Range_norm'].isnull().values.any():  #
-                continue
             # add attributes
             # continent
             cont = np.zeros(len(continent))
@@ -198,12 +167,8 @@ for index in indices:
             if measurement == "price":
                 current_course = np.asarray(raw_data['Open'])
             else:
-                if normalization:
-                    current_course = np.asarray(raw_data['Growth_norm'])
-                    current_range = np.asarray(raw_data['Range_norm'])
-                else:
-                    current_course = np.asarray(raw_data['Growth'])
-                    current_range = np.asarray(raw_data['Range'])
+                current_course = np.asarray(raw_data['Growth'])
+            current_range = np.asarray(raw_data['Range'])
             feature[:len(current_course), 0] = current_course
             if add_range:
                 feature[:len(current_range), 1] = current_range
@@ -236,6 +201,29 @@ dbfile.close()
 dbfile = open('{}/data_feature_output.pkl'.format(path), 'ab')
 pickle.dump(data_feature_outputs, dbfile)
 dbfile.close()
+
+# generate list of dictionaries
+data = []
+# append real data
+data.append({
+    'data_feature': data_feature,
+    'data_attribute': data_attribute,
+    'data_gen_flag': data_gen_flag,
+    'color': 'yellow',
+    'name': 'REAL'
+})
+# check distribution
+# measurement distribution
+measurement_distribution(dir=path, data=None, feature_output=data_feature_outputs, nr_bins=100)
+
+
+if m_intervall < 2:
+    n_lag = 15
+elif m_intervall < 5:
+    n_lag = 50
+else:
+    n_lag = 200
+autocorrelation(dir=path, data=None, data_feature_output=data_feature_outputs, n_lags=n_lag)
 
 np.savez("{}/data_train.npz".format(path), data_attribute=data_attribute, data_feature=data_feature,
          data_gen_flag=data_gen_flag)

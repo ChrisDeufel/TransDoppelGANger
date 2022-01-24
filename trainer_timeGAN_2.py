@@ -25,7 +25,6 @@ from gan.timegan import Encoder, Recovery, Generator, Discriminator, Supervisor
 from gan.gan_util import gen_noise
 import logging
 from util import calculate_mmd_rbf
-from torch import autograd
 
 
 def add_handler(logger, handlers):
@@ -75,10 +74,8 @@ class TimeGAN:
                  hidden_dim=24,
                  num_layer=3,
                  beta1=0.9,
-                 w_gamma=1,
-                 w_es=0.1,
-                 w_e0=10,
-                 w_g=100,
+                 w_lambda=1,
+                 w_eta=0.1,
                  checkpoint_dir="",
                  config_logging_file="",
                  time_logging_file=""):
@@ -91,10 +88,8 @@ class TimeGAN:
         self.hidden_dim = 4 * self.real_train_dl.dataset.data_feature_shape[2]
         self.num_layer = num_layer
         self.beta1 = beta1
-        self.w_gamma = w_gamma
-        self.w_es = w_es
-        self.w_e0 = w_e0
-        self.w_g = w_g
+        self.w_lambda = w_lambda
+        self.w_eta = w_eta
         self.checkpoint_dir = checkpoint_dir
 
         # Create and initialize networks.
@@ -139,10 +134,9 @@ class TimeGAN:
         self.config_logger.info("Z-Dimension: {0}".format(self.z_dim))
         self.config_logger.info("Hidden Dimension: {0}".format(self.hidden_dim))
         self.config_logger.info("Beta 1: {0}".format(self.beta1))
-        self.config_logger.info("w_gamma: {0}".format(self.w_gamma))
-        self.config_logger.info("w_es: {0}".format(self.w_es))
-        self.config_logger.info("w_g: {0}".format(self.w_g))
-        self.config_logger.info("w_e0: {0}".format(self.w_e0))
+        self.config_logger.info("w_gamma: {0}".format(self.w_lambda))
+        self.config_logger.info("w_eta: {0}".format(self.w_eta))
+
 
     def save(self, epoch):
         if not os.path.exists("{0}/epoch_{1}".format(self.checkpoint_dir, epoch)):
@@ -212,124 +206,6 @@ class TimeGAN:
             features = features[:, :, :-2]
         return features, attributes.cpu().numpy(), gen_flags, lengths
 
-    def train_one_iter_er(self, data_feature):
-        """ Train the model for one epoch.
-        """
-        self.nete.train()
-        self.netr.train()
-        X = data_feature
-        # train encoder & decoder
-        # Forward-pass
-        H = self.nete(X)
-        X_tilde = self.netr(H)
-        # Backward-pass
-        # nete & netr
-        self.optimizer_er.zero_grad()
-        # backward pass
-        err_e_T0 = self.l_mse(X, X_tilde)
-        err_e_0 = 10 * torch.sqrt(err_e_T0)
-        err_e_0.backward(retain_graph=True)
-        self.optimizer_er.step()
-
-    def train_one_iter_er_2(self, data_feature):
-        """ Train the model for one epoch.
-        """
-        X = data_feature
-        # Forward-pass
-        H = self.nete(X)
-        H_supervise = self.nets(H)
-        X_tilde = self.netr(H)
-        # Backward-pass
-        # G loss s
-        # nete & netr
-        self.optimizer_er.zero_grad()
-        # backward pass
-        err_s = self.l_mse(H[:, 1:, :], H_supervise[:, :-1, :])
-        err_e_T0 = self.l_mse(X, X_tilde)
-        err_e_0 = 10 * torch.sqrt(err_e_T0)
-        err_e = err_e_0 + 0.1 * err_s
-        err_e.backward(retain_graph=True)
-        self.optimizer_er.step()
-
-    def train_one_iter_s(self, data_feature):
-        """ Train the model for one epoch.
-        """
-        # set mini-batch
-        X = data_feature
-        # Forward-pass
-        H = self.nete(X)
-        H_supervise = self.nets(H)
-        # Backward-pass
-        self.optimizer_gs.zero_grad()
-        err_s = self.l_mse(H[:, 1:, :], H_supervise[:, :-1, :])
-        err_s.backward(retain_graph=True)
-        self.optimizer_gs.step()
-
-    def train_one_iter_g(self, data_feature):
-        """ Train the model for one epoch.
-        """
-        self.batch_size = data_feature.shape[0]
-
-        # set mini-batch
-        X = data_feature
-        Z = gen_noise((self.batch_size, data_feature.shape[1], self.z_dim)).to(self.device)
-        #with autograd.detect_anomaly():
-        autograd.set_detect_anomaly(True)
-        # Forward-pass
-        H = self.nete(X)
-        H_supervise = self.nets(H)
-        E_hat = self.netg(Z)
-        H_hat = self.nets(E_hat)
-        Y_fake = self.netd(H_hat)
-        X_hat = self.netr(H_hat)
-        Y_fake_e = self.netd(E_hat)
-        # Backward-pass
-        self.optimizer_gs.zero_grad()
-        # G loss s
-        err_s = self.l_mse(H[:, 1:, :], H_supervise[:, :-1, :])
-        # err_s.backward()
-        # G loss u
-        err_g_U = self.l_bce(Y_fake, torch.ones_like(Y_fake))
-        # G loss v
-        err_g_V1 = torch.mean(torch.abs(torch.sqrt(torch.std(X_hat, [0])[1] + 1e-6) - torch.sqrt(
-            torch.std(X, [0])[1] + 1e-6)))  # |a^2 - b^2|
-        err_g_V2 = torch.mean(
-            torch.abs((torch.mean(X_hat, [0])[0]) - (torch.mean(X, [0])[0])))  # |a - b|
-        err_g_V = err_g_V1 + err_g_V2
-        # G loss ue
-        err_g_U_e = self.l_bce(torch.ones_like(Y_fake_e), Y_fake_e)
-        err_g = err_g_U + self.w_gamma * err_g_U_e + 100 * torch.sqrt(err_s) + 100 * err_g_V
-        err_g.backward(retain_graph=True)
-        self.optimizer_gs.step()
-
-    def train_one_iter_d(self, data_feature):
-        """ Train the model for one epoch.
-        """
-        # set mini-batch
-        X = data_feature
-        Z = gen_noise((self.batch_size, data_feature.shape[1], self.z_dim)).to(self.device)
-
-        # train superviser
-
-        # forward pass
-        H = self.nete(X)
-        E_hat = self.netg(Z)
-        H_hat = self.nets(E_hat)
-        # self.forward_dg()
-        Y_real = self.netd(H)
-        Y_fake = self.netd(H_hat)
-        Y_fake_e = self.netd(E_hat)
-
-        # Backward-pass
-        self.optimizer_d.zero_grad()
-        err_d_real = self.l_bce(torch.ones_like(Y_real), Y_real)
-        err_d_fake = self.l_bce(torch.zeros_like(Y_fake), Y_fake)
-        err_d_fake_e = self.l_bce(torch.ones_like(Y_fake_e), Y_fake_e)
-        err_d = err_d_real + err_d_fake + err_d_fake_e * self.w_gamma
-        if err_d > 0.15:
-            err_d.backward(retain_graph=True)
-        self.optimizer_d.step()
-
     def generate_fake_feature(self, Z):
         self.netg.eval()
         self.nets.eval()
@@ -347,43 +223,52 @@ class TimeGAN:
         self.netd.train()
         self.nets.train()
         self.time_logger.info('Start Embedding Network Training')
-        for iter in range(epochs):
-            for batch_idx, (data_attribute, data_feature) in enumerate(self.real_train_dl):
-                data_feature = data_feature.to(self.device)
-                self.train_one_iter_er(data_feature)
-            self.time_logger.info('Embedding Network Training - END OF EPOCH {0}'.format(iter))
-        self.time_logger.info('Finish Embedding Network Training')
-
-        self.time_logger.info('Start Training with Supervised Loss Only')
-        for iter in range(epochs):
-            for batch_idx, (data_attribute, data_feature) in enumerate(self.real_train_dl):
-                data_feature = data_feature.to(self.device)
-                self.train_one_iter_s(data_feature)
-            self.time_logger.info('Supervised Loss Only - END OF EPOCH {0}'.format(iter))
-        self.time_logger.info('Finish Training with Supervised Loss Only')
-
-        self.time_logger.info('Start Joint Training')
         avg_mmd = []
         for iter in range(epochs):
-            self.nete.train()
-            self.netr.train()
-            self.netg.train()
-            self.netd.train()
-            self.nets.train()
             mmd = []
             for batch_idx, (data_attribute, data_feature) in enumerate(self.real_train_dl):
                 data_feature = data_feature.to(self.device)
-                Z = gen_noise((data_feature.shape[0], data_feature.shape[1], self.z_dim)).to(self.device)
+                # (1) Map between Feature and Latent Space
+                H = self.nete(data_feature)
+                H_supervise = self.nets(H)
+                X_tilde = self.netr(H)
+                # (2) Generate Synthetic Latent Codes
+                Z = gen_noise((self.batch_size, data_feature.shape[1], self.z_dim)).to(self.device)
+                # add mmd
                 fake_feature = self.generate_fake_feature(Z)
                 mmd.append(calculate_mmd_rbf(torch.mean(fake_feature, dim=0).detach().cpu().numpy(),
-                                            torch.mean(data_feature, dim=0).detach().cpu().numpy()))
-                for kk in range(2):
-                    # Train Generator and Supervisor
-                    self.train_one_iter_g(data_feature)
-                    # Train Embedder and Recovery again
-                    self.train_one_iter_er_2(data_feature)
-                self.train_one_iter_d(data_feature)
-            self.time_logger.info('Joint Training - END OF EPOCH {0}'.format(iter))
+                                             torch.mean(data_feature, dim=0).detach().cpu().numpy()))
+                E_hat = self.netg(Z)
+                H_hat = self.nets(E_hat)
+                # (3) Distinguish between Real and Synthetic Codes
+                Y_real = self.netd(H)
+                Y_fake = self.netd(H_hat)
+                # (4) Compute Reconstruction, Unsupervised, and Supervised Losses
+                # Reconstruction Loss
+                err_r = self.l_mse(data_feature, X_tilde)
+                # Supervised Loss
+                err_s = self.l_mse(H[:, 1:, :], H_supervise[:, :-1, :])
+                # Unsupervised Loss
+                err_d_real = self.l_bce(Y_real, torch.ones_like(Y_real))
+                err_d_fake = self.l_bce(Y_fake, torch.zeros_like(Y_fake))
+                # (5) update e, r, g, d, s
+                # Embedding and Recovery
+                self.optimizer_er.zero_grad()
+                err_er = self.w_lambda*err_s + err_r
+                err_er.backward()
+                self.optimizer_er.step()
+                # Generator and Supervisor
+                self.optimizer_gs.zero_grad()
+                err_g_fake = self.l_bce(Y_fake, torch.ones_like(Y_fake))
+                err_gs = self.w_eta*err_s + err_g_fake
+                err_gs.backward()
+                self.optimizer_gs.step()
+                # Discriminator
+                self.optimizer_d.zero_grad()
+                err_d = err_d_real + err_d_fake
+                err_d.backward()
+                self.optimizer_d.step()
+            avg_mmd.append(np.asarray(mmd).mean())
             if iter % saver_frequency == 0:
                 self.nete.train()
                 self.netr.train()

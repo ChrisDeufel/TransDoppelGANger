@@ -75,7 +75,8 @@ class Recovery(nn.Module):
 
     def __init__(self, output_size, hidden_dim=24, num_layer=3):
         super(Recovery, self).__init__()
-        self.rnn = nn.GRU(input_size=hidden_dim, hidden_size=output_size, num_layers=num_layer)
+        # self.rnn = nn.GRU(input_size=hidden_dim, hidden_size=output_size, num_layers=num_layer)
+        self.rnn = nn.LSTM(input_size=hidden_dim, hidden_size=output_size, num_layers=num_layer)
         self.fc = nn.Linear(output_size, output_size)
         self.sigmoid = nn.Sigmoid()
         self.apply(_weights_init)
@@ -101,7 +102,8 @@ class Generator(nn.Module):
 
     def __init__(self, z_dim=6, hidden_dim=24, num_layer=3):
         super(Generator, self).__init__()
-        self.rnn = nn.GRU(input_size=z_dim, hidden_size=hidden_dim, num_layers=num_layer)
+        # self.rnn = nn.GRU(input_size=z_dim, hidden_size=hidden_dim, num_layers=num_layer)
+        self.rnn = nn.LSTM(input_size=z_dim, hidden_size=hidden_dim, num_layers=num_layer)
         self.fc = nn.Linear(hidden_dim, hidden_dim)
         self.sigmoid = nn.Sigmoid()
         self.apply(_weights_init)
@@ -127,7 +129,8 @@ class Supervisor(nn.Module):
 
     def __init__(self, hidden_dim=24, num_layer=3):
         super(Supervisor, self).__init__()
-        self.rnn = nn.GRU(input_size=hidden_dim, hidden_size=hidden_dim, num_layers=num_layer)
+        # self.rnn = nn.GRU(input_size=hidden_dim, hidden_size=hidden_dim, num_layers=num_layer)
+        self.rnn = nn.LSTM(input_size=hidden_dim, hidden_size=hidden_dim, num_layers=num_layer)
         self.fc = nn.Linear(hidden_dim, hidden_dim)
         self.sigmoid = nn.Sigmoid()
         self.apply(_weights_init)
@@ -153,7 +156,9 @@ class Discriminator(nn.Module):
 
     def __init__(self, hidden_dim=24, num_layer=3):
         super(Discriminator, self).__init__()
-        self.rnn = nn.GRU(input_size=hidden_dim, hidden_size=int(hidden_dim/2), num_layers=num_layer, bidirectional=True)
+        # self.rnn = nn.GRU(input_size=hidden_dim, hidden_size=int(hidden_dim/2), num_layers=num_layer, bidirectional=True)
+        self.rnn = nn.LSTM(input_size=hidden_dim, hidden_size=int(hidden_dim / 2), num_layers=num_layer,
+                          bidirectional=True)
         self.fc = nn.Linear(hidden_dim, 1)
         self.sigmoid = nn.Sigmoid()
         self.apply(_weights_init)

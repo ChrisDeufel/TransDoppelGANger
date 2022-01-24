@@ -8,10 +8,15 @@ import torch.nn.functional as F
 import torch.nn as nn
 import matplotlib.pyplot as plt
 
-feature_open = np.load("data/index_course/data_feature_n_g.npy")
-attribute_open = np.load("data/index_course/data_attribute_n_g.npy")
-
-feature_growth = np.load("data/index_growth/data_feature_n_g.npy")
-attribute_growth = np.load("data/index_growth/data_attribute_n_g.npy")
-
-print('hello')
+x = np.random.normal(size=(100))
+ks = 3
+y = np.zeros_like(x)
+for i in range(len(x)):
+    if i-int(ks/2) < 0:
+        y[i] = np.mean(x[:ks])
+    elif i+int(ks/2) > (len(x)-1):
+        y[i] = np.mean(x[-ks:])
+    else:
+        y[i] = np.mean(x[i-int(ks/2):i+int(ks/2)])
+print(x)
+print(y)

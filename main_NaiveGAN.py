@@ -16,15 +16,15 @@ if gan_type == 'NaiveGAN':
 else:
     isWasserstein = True
 
-checkpoint_dir = 'runs/{}/{}/test/checkpoint'.format(dataset_name, gan_type)
+checkpoint_dir = 'runs/{}/{}/1/checkpoint'.format(dataset_name, gan_type)
 if not os.path.exists(checkpoint_dir):
     os.makedirs(checkpoint_dir)
 
-time_logging_file = 'runs/{}/{}/test/time.log'.format(dataset_name, gan_type)
-config_logging_file = 'runs/{}/{}/test/config.log'.format(dataset_name, gan_type)
+time_logging_file = 'runs/{}/{}/1/time.log'.format(dataset_name, gan_type)
+config_logging_file = 'runs/{}/{}/1/config.log'.format(dataset_name, gan_type)
 
 real_train_dl = DataLoader(dataset=dataset, batch_size=batch_size, shuffle=True)
 trainer = NAIVEGAN(real_train_dl, device=device, checkpoint_dir=checkpoint_dir, time_logging_file=time_logging_file,
                    config_logging_file=config_logging_file, isWasserstein=isWasserstein)
-epochs = 2
-trainer.train(epochs=epochs, saver_frequency=1)
+epochs = 401
+trainer.train(epochs=epochs, saver_frequency=20)
