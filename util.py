@@ -14,24 +14,53 @@ import matplotlib.pyplot as plt
 import logging
 import argparse
 
+
+def add_handler(logger, handlers):
+    for handler in handlers:
+        logger.addHandler(handler)
+
+
+def setup_logging(time_logging_file, config_logging_file):
+    # SET UP LOGGING
+    config_logger = logging.getLogger("config_logger")
+    config_logger.setLevel(logging.INFO)
+    # config_logger.setLevel(logging.INFO)
+    time_logger = logging.getLogger("time_logger")
+    time_logger.setLevel(logging.INFO)
+    # time_logger.setLevel(logging.INFO)
+    # set up time handler
+    time_formatter = logging.Formatter('%(asctime)s:%(message)s')
+    time_handler = logging.FileHandler(time_logging_file)
+    time_handler.setLevel(logging.INFO)
+    time_handler.setFormatter(time_formatter)
+    stream_handler = logging.StreamHandler()
+    stream_handler.setLevel(logging.INFO)
+    stream_handler.setFormatter(time_formatter)
+    add_handler(time_logger, [time_handler, stream_handler])
+    # setup config handler
+    config_formatter = logging.Formatter('%(message)s')
+    config_handler = logging.FileHandler(config_logging_file)
+    config_handler.setLevel(logging.INFO)
+    config_handler.setFormatter(config_formatter)
+    config_logger.addHandler(config_handler)
+    return config_logger, time_logger
+
+
 def options_parser():
     parser = argparse.ArgumentParser(description='Train a GAN to generate sequential, real-valued data.')
-    parser.add_argument('-d', '--dataset', help='name of dataset', type=str, default='FCC_MBA')
+    parser.add_argument('-da', '--dataset', help='name of dataset', type=str, default='FCC_MBA')
     parser.add_argument('-wl', '--w_lambert', help='data should be w lambert transformed', type=bool, default=False)
-    parser.add_argument('-ks', '--kernel_smoothing', help='window size for kernel smoothing', type=str, default=None)
+    parser.add_argument('-ks', '--kernel_smoothing', help='window size for kernel smoothing', type=int, default=None)
     parser.add_argument('-gt', '--gan_type', help='name of GAN', type=str, default='RNN')
-    parser.add_argument('-dt', '--dis_type', help='discriminator type', type=str, default='normal')
+    parser.add_argument('-dt', '--dis_type', help='discriminator type', type=str, default=None)
     parser.add_argument('-sl', '--sample_len', help='sample length for DoppelGANger', type=int, default=1)
     parser.add_argument('-bs', '--batch_size', help='Minibatch size', type=int, default=20)
     parser.add_argument('-nd', '--noise_dim', help='Dimension of random Input Noise', type=int, default=20)
     parser.add_argument('-ep', '--num_epochs', help='Number of Epochs to train', type=int, default=401)
-    parser.add_argument('-ic', '--is_conditional', help='For RC GAN', type=bool, default=True)
+    parser.add_argument('-ic', '--is_conditional', help='For RC GAN', type=bool, default=False)
+    parser.add_argument('-dv', '--device', help='Run on GPU or CPU', type=str, default='cpu')
+    parser.add_argument('-sf', '--save_frequency', help='every x epoch to save model parameters', type=int, default=20)
     return parser
-
-
-def add_handler(handlers, logger):
-    for handler in handlers:
-        logger.addHandler(handler)
 
 
 def setup_logger(name, log_file, formatter, level=logging.INFO):
@@ -42,6 +71,7 @@ def setup_logger(name, log_file, formatter, level=logging.INFO):
     logger.setLevel(level)
     logger.addHandler(handler)
     return logger
+
 
 def draw_attribute(data, outputs, path=None):
     if isinstance(data, list):
@@ -170,6 +200,7 @@ def renormalize_per_sample(data_feature, data_attribute, data_feature_outputs,
     data_attribute = data_attribute[:, 0: attr_dim_cp]
 
     return data_feature, data_attribute
+
 
 def kernel_smoothing(x, ks):
     y = np.zeros_like(x)
@@ -425,7 +456,7 @@ def extract_len(data_gen_flag):
     return np.asarray(time), max_seq_len
 
 
-def NormMinMax(data):
+def norm_min_max(data):
     """Min-Max Normalizer.
 
     Args:

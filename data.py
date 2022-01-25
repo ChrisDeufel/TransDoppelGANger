@@ -2,11 +2,10 @@ from torch.utils.data import Dataset
 import torch
 from load_data import load_data
 from util import add_gen_flag, add_gen_flag_split, normalize_per_sample, normalize_per_sample_split, extract_len, \
-    NormMinMax
+    norm_min_max
 import numpy as np
 import os
 import pickle
-import copy
 
 
 class Data(Dataset):

@@ -4,47 +4,15 @@ import torch.optim as optim
 import torch
 from torch.utils.tensorboard import SummaryWriter
 import os
-import logging
 from gan.network import AttrDiscriminator, Discriminator, DoppelGANgerGeneratorRNN, DoppelGANgerGeneratorAttention, \
     TransformerDiscriminator
 from gan.cgan import CGANGenerator, CGANDiscriminator
 from gan.rcgan import RGANGenerator, RGANDiscriminator
-from gan.timegan import Encoder, Recovery, Generator, Discriminator, Supervisor
+from gan.timegan import TGEncoder, TGRecovery, TGGenerator, TGDiscriminator, TGSupervisor
 from gan.naivegan import NaiveGanGenerator, NaiveGanDiscriminator
 
 from gan.gan_util import gen_noise
-from util import calculate_mmd_rbf
-
-
-def add_handler(logger, handlers):
-    for handler in handlers:
-        logger.addHandler(handler)
-
-
-def setup_logging(time_logging_file, config_logging_file):
-    # SET UP LOGGING
-    config_logger = logging.getLogger("config_logger")
-    config_logger.setLevel(logging.INFO)
-    # config_logger.setLevel(logging.INFO)
-    time_logger = logging.getLogger("time_logger")
-    time_logger.setLevel(logging.INFO)
-    # time_logger.setLevel(logging.INFO)
-    # set up time handler
-    time_formatter = logging.Formatter('%(asctime)s:%(message)s')
-    time_handler = logging.FileHandler(time_logging_file)
-    time_handler.setLevel(logging.INFO)
-    time_handler.setFormatter(time_formatter)
-    stream_handler = logging.StreamHandler()
-    stream_handler.setLevel(logging.INFO)
-    stream_handler.setFormatter(time_formatter)
-    add_handler(time_logger, [time_handler, stream_handler])
-    # setup config handler
-    config_formatter = logging.Formatter('%(message)s')
-    config_handler = logging.FileHandler(config_logging_file)
-    config_handler.setLevel(logging.INFO)
-    config_handler.setFormatter(config_formatter)
-    config_logger.addHandler(config_handler)
-    return config_logger, time_logger
+from util import calculate_mmd_rbf, setup_logging
 
 
 class DoppelGANger:
@@ -168,7 +136,7 @@ class DoppelGANger:
             batch_size -= 1
         rounds = self.real_train_dl.dataset.data_attribute_shape[0] // batch_size
         sampled_features = np.zeros((0, self.real_train_dl.dataset.data_feature_shape[1],
-                                     self.real_train_dl.dataset.data_feature_shape[2]-2))
+                                     self.real_train_dl.dataset.data_feature_shape[2] - 2))
         sampled_attributes = np.zeros((0, self.real_train_dl.dataset.data_attribute_shape[1]))
         sampled_gen_flags = np.zeros((0, self.real_train_dl.dataset.data_feature_shape[1]))
         sampled_lengths = np.zeros(0)
@@ -324,7 +292,8 @@ class DoppelGANger:
         # self.writer.add_graph(model=self.dis, input_to_model=[
         #     torch.randn([1, self.dis.input_feature_shape[1], self.dis.input_feature_shape[2]]).to(self.device),
         #     torch.randn([1, self.dis.input_attribute_shape[1]]).to(self.device)])
-        # self.writer.add_graph(self.attr_dis, input_to_model=torch.randn([1, self.attr_dis.input_size]).to(self.device))
+        # self.writer.add_graph(self.attr_dis, input_to_model=torch.randn([1, self.attr_dis.input_size]).
+        # to(self.device))
         # self.writer.add_graph(self.gen,
         #                       input_to_model=[torch.randn(1, self.noise_dim).to(self.device),
         #                                       torch.randn(1, self.noise_dim).to(self.device),
@@ -671,7 +640,7 @@ class NAIVEGAN:
             batch_size -= 1
         rounds = self.real_train_dl.dataset.data_attribute_shape[0] // batch_size
         sampled_features = np.zeros((0, self.real_train_dl.dataset.data_feature_shape[1],
-                                     self.real_train_dl.dataset.data_feature_shape[2]-2))
+                                     self.real_train_dl.dataset.data_feature_shape[2] - 2))
         sampled_attributes = np.zeros((0, self.real_train_dl.dataset.data_attribute_shape[1]))
         sampled_gen_flags = np.zeros((0, self.real_train_dl.dataset.data_feature_shape[1]))
         sampled_lengths = np.zeros(0)
@@ -771,6 +740,7 @@ class TimeGAN:
                  z_dim=6,
                  hidden_dim=24,
                  num_layer=3,
+                 batch_size=128,
                  beta1=0.9,
                  w_lambda=1,
                  w_eta=0.1,
@@ -789,18 +759,19 @@ class TimeGAN:
         self.w_lambda = w_lambda
         self.w_eta = w_eta
         self.checkpoint_dir = checkpoint_dir
+        self.batch_size = batch_size
 
         # Create and initialize networks.
         # determine input size for encoder
         num_features = self.real_train_dl.dataset.data_feature.shape[2]
-        self.nete = Encoder(input_size=num_features, hidden_dim=self.hidden_dim, num_layer=self.num_layer).to(
+        self.nete = TGEncoder(input_size=num_features, hidden_dim=self.hidden_dim, num_layer=self.num_layer).to(
             self.device)
-        self.netr = Recovery(output_size=num_features, hidden_dim=self.hidden_dim, num_layer=self.num_layer).to(
+        self.netr = TGRecovery(output_size=num_features, hidden_dim=self.hidden_dim, num_layer=self.num_layer).to(
             self.device)
-        self.netg = Generator(z_dim=self.z_dim, hidden_dim=self.hidden_dim, num_layer=self.num_layer).to(self.device)
-        self.netd = Discriminator(hidden_dim=self.hidden_dim, num_layer=self.num_layer).to(
+        self.netg = TGGenerator(z_dim=self.z_dim, hidden_dim=self.hidden_dim, num_layer=self.num_layer).to(self.device)
+        self.netd = TGDiscriminator(hidden_dim=self.hidden_dim, num_layer=self.num_layer).to(
             self.device)
-        self.nets = Supervisor(hidden_dim=self.hidden_dim, num_layer=self.num_layer).to(self.device)
+        self.nets = TGSupervisor(hidden_dim=self.hidden_dim, num_layer=self.num_layer).to(self.device)
         # loss
         self.l_mse = nn.MSELoss()
         self.l_r = nn.L1Loss()
@@ -829,12 +800,12 @@ class TimeGAN:
 
         self.config_logger.info("Discriminator Adversarial Loss: {0}".format(self.l_bce))
 
+        self.config_logger.info("Batch Size: {0}".format(self.batch_size))
         self.config_logger.info("Z-Dimension: {0}".format(self.z_dim))
         self.config_logger.info("Hidden Dimension: {0}".format(self.hidden_dim))
         self.config_logger.info("Beta 1: {0}".format(self.beta1))
         self.config_logger.info("w_gamma: {0}".format(self.w_lambda))
         self.config_logger.info("w_eta: {0}".format(self.w_eta))
-
 
     def save(self, epoch):
         if not os.path.exists("{0}/epoch_{1}".format(self.checkpoint_dir, epoch)):
@@ -912,7 +883,7 @@ class TimeGAN:
         H_hat = self.nets(E_hat)
         return self.netr(H_hat)
 
-    def train(self, epochs, saver_frequency=10):
+    def train(self, epochs, writer_frequency=1, saver_frequency=10):
         """ Train the model
         """
         self.nete.train()
@@ -920,11 +891,11 @@ class TimeGAN:
         self.netg.train()
         self.netd.train()
         self.nets.train()
-        self.time_logger.info('Start Embedding Network Training')
         avg_mmd = []
-        for iter in range(epochs):
+        for epoch in range(epochs):
             mmd = []
             for batch_idx, (data_attribute, data_feature) in enumerate(self.real_train_dl):
+                # torch.autograd.set_detect_anomaly(True)
                 data_feature = data_feature.to(self.device)
                 # (1) Map between Feature and Latent Space
                 H = self.nete(data_feature)
@@ -945,38 +916,40 @@ class TimeGAN:
                 # Reconstruction Loss
                 err_r = self.l_mse(data_feature, X_tilde)
                 # Supervised Loss
-                err_s = self.l_mse(H[:, 1:, :], H_supervise[:, :-1, :])
+                err_s = self.l_mse(H_supervise[:, :-1, :], H[:, 1:, :])
+                # Encoder and Recovery Loss
+                err_er = self.w_lambda * err_s + err_r
+                self.optimizer_er.zero_grad()
+                # Supervisor and Generator Loss
+                err_g_fake = self.l_bce(Y_fake, torch.ones_like(Y_fake))
+                err_gs = self.w_eta * err_s + err_g_fake
+                self.optimizer_gs.zero_grad()
                 # Unsupervised Loss
                 err_d_real = self.l_bce(Y_real, torch.ones_like(Y_real))
                 err_d_fake = self.l_bce(Y_fake, torch.zeros_like(Y_fake))
-                # (5) update e, r, g, d, s
-                # Embedding and Recovery
-                self.optimizer_er.zero_grad()
-                err_er = self.w_lambda*err_s + err_r
-                err_er.backward()
-                self.optimizer_er.step()
-                # Generator and Supervisor
-                self.optimizer_gs.zero_grad()
-                err_g_fake = self.l_bce(Y_fake, torch.ones_like(Y_fake))
-                err_gs = self.w_eta*err_s + err_g_fake
-                err_gs.backward()
-                self.optimizer_gs.step()
-                # Discriminator
-                self.optimizer_d.zero_grad()
+                # Discriminator Loss
                 err_d = err_d_real + err_d_fake
+                self.optimizer_d.zero_grad()
+                # (5) update e, r, g, d, s
+                err_er.backward(retain_graph=True)
+                # Generator and Supervisor
+                err_gs.backward(retain_graph=True)
+                # Discriminator
                 err_d.backward()
+                self.optimizer_er.step()
+                self.optimizer_gs.step()
                 self.optimizer_d.step()
             avg_mmd.append(np.asarray(mmd).mean())
-            if iter % saver_frequency == 0:
+            self.time_logger.info('END OF EPOCH {0}'.format(epoch))
+            if epoch % saver_frequency == 0:
                 self.nete.train()
                 self.netr.train()
                 self.netg.train()
                 self.netd.train()
                 self.nets.train()
-                self.save(iter)
-                self.inference(iter)
+                self.save(epoch)
+                self.inference(epoch)
         np.save("{}/mmd.npy".format(self.checkpoint_dir), np.asarray(avg_mmd))
-        self.time_logger.info('Finish Joint Training')
 
 
 class RCGAN:
@@ -1073,7 +1046,7 @@ class RCGAN:
             batch_size -= 1
         rounds = self.real_train_dl.dataset.data_attribute_shape[0] // batch_size
         sampled_features = np.zeros((0, self.real_train_dl.dataset.data_feature_shape[1],
-                                     self.real_train_dl.dataset.data_feature_shape[2]-2))
+                                     self.real_train_dl.dataset.data_feature_shape[2] - 2))
         sampled_attributes = np.zeros((0, self.real_train_dl.dataset.data_attribute_shape[1]))
         sampled_gen_flags = np.zeros((0, self.real_train_dl.dataset.data_feature_shape[1]))
         sampled_lengths = np.zeros(0)
@@ -1107,7 +1080,7 @@ class RCGAN:
             lengths = np.zeros(features.shape[0])
             for i in range(len(features)):
                 winner = (features[i, :, -1] > features[i, :, -2])
-                argmax = np.argmax(winner==True)
+                argmax = np.argmax(winner == True)
                 if argmax == 0:
                     gen_flags[i, :] = 1
                 else:
