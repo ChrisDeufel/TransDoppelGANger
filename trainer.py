@@ -15,9 +15,11 @@ from gan.naivegan import NaiveGanGenerator, NaiveGanDiscriminator
 from gan.gan_util import gen_noise
 from util import calculate_mmd_rbf
 
+
 def add_handler(logger, handlers):
     for handler in handlers:
         logger.addHandler(handler)
+
 
 def setup_logging(time_logging_file, config_logging_file):
     # SET UP LOGGING

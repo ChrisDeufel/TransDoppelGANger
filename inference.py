@@ -1,10 +1,7 @@
 from torch.utils.data import DataLoader
 import torch
 import numpy as np
-from trainer import Trainer
-from trainer_RCGAN import RCGAN
-from trainer_timeGAN_original import TimeGAN
-from trainer_CGAN import CGAN
+from trainer import DoppelGANger, RCGAN, CGAN, NAIVEGAN, TimeGAN
 from data import Data, LargeData, SplitData, TimeGanData
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
@@ -69,12 +66,12 @@ for n in range(1, 2, 1):
     for i in range(0, 400, 20):
         model_dir = "runs/{}/{}/{}/checkpoint/epoch_{}".format(dataset_name, gan_type, n, i)
         if gan_type == "RNN" or gan_type == "TRANSFORMER":
-            trainer = Trainer(criterion=None,
-                              real_train_dl=real_train_dl, data_feature_shape=data_feature_shape, device=device,
-                              noise_dim=noise_dim, sample_len=sample_len, gen_type=gan_type, att_dim=attn_dim,
-                              num_heads=num_heads, g_lr=g_lr, g_beta1=g_beta1, d_lr=d_lr, d_beta1=d_beta1,
-                              attr_d_lr=attr_d_lr, attr_d_beta1=attr_d_beta1
-                              )
+            trainer = DoppelGANger(criterion=None,
+                                   real_train_dl=real_train_dl, data_feature_shape=data_feature_shape, device=device,
+                                   noise_dim=noise_dim, sample_len=sample_len, gen_type=gan_type, att_dim=attn_dim,
+                                   num_heads=num_heads, g_lr=g_lr, g_beta1=g_beta1, d_lr=d_lr, d_beta1=d_beta1,
+                                   attr_d_lr=attr_d_lr, attr_d_beta1=attr_d_beta1
+                                   )
         elif gan_type == "RCGAN" or gan_type == "RGAN":
             trainer = RCGAN(real_train_dl, device=device, checkpoint_dir=checkpoint_dir, isConditional=isConditional)
         elif gan_type == "CGAN":
@@ -89,7 +86,7 @@ for n in range(1, 2, 1):
         while dataset.data_attribute_shape[0] % batch_size != 0:
             batch_size -= 1
         rounds = dataset.data_attribute_shape[0] // batch_size
-        sampled_features = np.zeros((0, dataset.data_feature_shape[1], dataset.data_feature_shape[2]-2))
+        sampled_features = np.zeros((0, dataset.data_feature_shape[1], dataset.data_feature_shape[2] - 2))
         sampled_attributes = np.zeros((0, dataset.data_attribute_shape[1]))
         sampled_gen_flags = np.zeros((0, dataset.data_feature_shape[1]))
         sampled_lengths = np.zeros(0)
