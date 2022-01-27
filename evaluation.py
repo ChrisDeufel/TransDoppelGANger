@@ -164,30 +164,33 @@ def autocorrelation(dir, data, data_feature_output, n_lags, partial=False):
             data_feature = set['data_feature']
             data_gen_flag = set['data_gen_flag']
             data_feature = data_feature[:, :, feature_dim]
-            # auto = np.apply_along_axis(func1d=autocorr, axis=1, arr=data_feature)
-            auto = np.zeros((0, n_lags + 1))
+            auto = 0
+            counter = 0
             for i in range(len(data_feature)):
                 len_seq = np.count_nonzero(data_gen_flag[i, :])
                 if partial:
-                    if len_seq < (n_lags * 2) + 2:
+                    if (len_seq//2) <= n_lags:
                         continue
                 else:
-                    if len_seq < n_lags + 1:
+                    if len_seq < n_lags:
                         continue
                 if partial:
                     try:
-                        auto = np.concatenate(
-                            (auto, np.expand_dims(part_autocorr(data_feature[i, :len_seq], n_lags), axis=0)),
-                            axis=0)
+                        auto += part_autocorr(data_feature[i, :len_seq + 1], n_lags)
+                        counter += 1
                     except np.linalg.LinAlgError:
                         continue
 
                 else:
-                    auto = np.concatenate((auto, np.expand_dims(autocorr(data_feature[i, :len_seq], n_lags), axis=0)),
-                                          axis=0)
-            auto = auto[~np.isnan(auto).any(axis=1), :]
-            data_avg_auto = np.mean(auto, axis=0)
-            data_to_plot.append({"auto_data": data_avg_auto, "name": set['name'], "color": set['color']})
+                    auto += autocorr(data_feature[i, :len_seq+1], n_lags)
+                    counter += 1
+            if counter != 0:
+                auto /= counter
+            else:
+                auto = np.zeros(n_lags)
+            # autos = autos[~np.isnan(autos).any(axis=1), :]
+            # data_avg_auto = np.mean(autos, axis=0)
+            data_to_plot.append({"auto_data": auto, "name": set['name'], "color": set['color']})
         if partial:
             file = "{0}/partial_auto_feature_{1}".format(dir, feature_dim)
         else:
@@ -624,9 +627,12 @@ def mse_autocorrelation(dir, real_data_features, sample_data_features, data_feat
 
 
 # load web dataset for testing
-fake_data = False
-w_lambert = True
-kernel_smoothing = 3
+fake_data = True
+w_lambert = False
+kernel_smoothing = None
+
+datasets = [{'name': "FCC_MBA", 'auto': [(15, False), (8, True)]}]
+"""
 datasets = [
     {'name': "index_growth_1mo", 'auto': [(15, False), (8, True)]},
     {'name': "index_growth_3mo", 'auto': [(50, False), (20, True)]},
@@ -635,8 +641,8 @@ datasets = [
     {'name': "index_growth_range_3mo", 'auto': [(50, False), (20, True)]},
     {'name': "index_growth_range_12mo", 'auto': [(200, False), (150, True)]}
     ]
-
-eval_metrics = ['measurement', 'auto', 'metadata', 'seq_len', 'embedding']
+"""
+eval_metrics = ['auto']
 normalize = True
 gan_types = ['NaiveGAN']
 embedding_metrics = ['TSNE', 'PCA']
@@ -701,8 +707,16 @@ for dataset in datasets:
                         emd(dir=dir, data=data, data_feature_output=data_feature_outputs, epoch=n)
                     if 'auto' in eval_metrics:
                         for metric in dataset['auto']:
+                            partial = metric[1]
+                            if dataset['name'] == 'web' or dataset['name'] == 'FCC_MBA':
+                                if partial:
+                                    n_lags = (data[0]['data_feature'].shape[1] // 2) - 1
+                                else:
+                                    n_lags = data[0]['data_feature'].shape[1]
+                            else:
+                                n_lags = metric[0]
                             autocorrelation(dir=dir, data=data, data_feature_output=data_feature_outputs,
-                                            n_lags=metric[0], partial=metric[1])
+                                            n_lags=n_lags, partial=partial)
                     if 'NN' in eval_metrics:
                         nearest_neighbors(dir=dir, real_data_features=data_feature,
                                           sampled_data_features=sampled_features,
@@ -732,8 +746,16 @@ for dataset in datasets:
             measurement_distribution(dir=dir, data=data, feature_output=data_feature_outputs)
         if 'auto' in eval_metrics:
             for metric in dataset['auto']:
+                partial = metric[1]
+                if dataset['name'] == 'web' or dataset['name'] == 'FCC_MBA':
+                    if partial:
+                        n_lags = (data[0]['data_feature'].shape[1] // 2) - 1
+                    else:
+                        n_lags = data[0]['data_feature'].shape[1]
+                else:
+                    n_lags = metric[0]
                 autocorrelation(dir=dir, data=data, data_feature_output=data_feature_outputs,
-                                n_lags=metric[0], partial=metric[1])
+                                n_lags=n_lags, partial=partial)
         # meta_meas_corr(dir=evaluation_dir, data=data, data_attribute_outputs=data_attribute_outputs,
         #                data_feature_outputs=data_feature_outputs)
         if 'embedding' in eval_metrics:
