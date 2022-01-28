@@ -515,7 +515,7 @@ class CGAN:
                 if argmax == 0:
                     gen_flags[i, :] = 1
                 else:
-                    gen_flags[i, :argmax] = 1
+                    gen_flags[i, :argmax+1] = 1
                 lengths[i] = argmax
             if not return_gen_flag_feature:
                 features = features[:, :, :-2]
@@ -674,7 +674,7 @@ class NAIVEGAN:
                 if argmax == 0:
                     gen_flags[i, :] = 1
                 else:
-                    gen_flags[i, :argmax] = 1
+                    gen_flags[i, :argmax+1] = 1
                 lengths[i] = argmax
             if not return_gen_flag_feature:
                 features = features[:, :, :-2]
@@ -869,7 +869,7 @@ class TimeGAN:
             if argmax == 0:
                 gen_flags[i, :] = 1
             else:
-                gen_flags[i, :argmax] = 1
+                gen_flags[i, :argmax+1] = 1
             lengths[i] = argmax
         if not return_gen_flag_feature:
             features = features[:, :, :-2]
@@ -1084,7 +1084,7 @@ class RCGAN:
                 if argmax == 0:
                     gen_flags[i, :] = 1
                 else:
-                    gen_flags[i, :argmax] = 1
+                    gen_flags[i, :argmax+1] = 1
                 lengths[i] = argmax
             if not return_gen_flag_feature:
                 features = features[:, :, :-2]

@@ -642,9 +642,9 @@ datasets = [
     {'name': "index_growth_range_12mo", 'auto': [(200, False), (150, True)]}
     ]
 """
-eval_metrics = ['auto']
+eval_metrics = ['auto', 'metadata', 'seq_len', 'measurement']
 normalize = True
-gan_types = ['NaiveGAN']
+gan_types = ['TimeGAN']
 embedding_metrics = ['TSNE', 'PCA']
 qq_metrics = ['mean', 'variance', 'skewness', 'kurtosis']
 
@@ -674,7 +674,7 @@ for dataset in datasets:
     if fake_data:
         for gan_type in gan_types:
             for i in range(1, 2):
-                for n in range(0, 400, 20):
+                for n in range(200, 420, 20):
                     sample_path = 'runs/{}/{}/{}/checkpoint/epoch_{}/generated_samples.npz'.format(dataset['name'],
                                                                                                    gan_type, i, n)
                     sampled_data = np.load(sample_path)
@@ -689,7 +689,7 @@ for dataset in datasets:
                         'data_gen_flag': sampled_gen_flags,
                         'data_lengths': sampled_lengths,
                         'color': 'blue',
-                        'name': 'torchDoppelGANger'
+                        'name': gan_type
                     })
                     dir = "{}/{}/{}/epoch_{}".format(eval_dir, gan_type, i, n)
                     if not os.path.exists(dir):
