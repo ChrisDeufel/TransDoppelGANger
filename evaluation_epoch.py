@@ -37,7 +37,7 @@ def plot_qq_plot(data, file, metric):
     plt.savefig("{0}.png".format(file))
 
 
-def qq_plot(dir, data, data_feature_output, metric='mean'):
+def qq_plot(dir, data, data_feature_output, epoch, metric='mean'):
     # create folder to save files
     feature_dim = 0
     for f in data_feature_output:
@@ -58,6 +58,9 @@ def qq_plot(dir, data, data_feature_output, metric='mean'):
                 f_metric = stats.kurtosis(data_feature, axis=1)
             data_to_plot.append({"feature_metric": f_metric, "name": set['name'], "color": set['color']})
         file = "{}/QQ_{}_feature_{}".format(dir, metric, feature_dim)
+        if not os.path.exists(file):
+            os.makedirs(file)
+        file = "{}/epoch_{}".format(file, epoch)
         plot_qq_plot(data=data_to_plot, file=file, metric=metric)
 
 
@@ -78,7 +81,7 @@ def plot_embedding(data, file, embedding):
     plt.savefig("{0}.png".format(file))
 
 
-def embedding(dir, data, data_feature_output, embedding='TSNE'):
+def embedding(dir, data, data_feature_output, epoch, embedding='TSNE'):
     feature_dim = 0
     for f in data_feature_output:
         if f.type_ == output.OutputType.DISCRETE:
@@ -94,6 +97,9 @@ def embedding(dir, data, data_feature_output, embedding='TSNE'):
                 f_embedded = PCA(n_components=2).fit_transform(data_feature)
             data_to_plot.append({"embedded_features": f_embedded, "name": set['name'], "color": set['color']})
         file = "{}/{}_feature_{}".format(dir, embedding, feature_dim)
+        if not os.path.exists(file):
+            os.makedirs(file)
+        file = "{}/epoch_{}".format(file, epoch)
         plot_embedding(data=data_to_plot, file=file, embedding=embedding)
 
 
@@ -147,7 +153,7 @@ def plot_auto(data, file, partial):
     plt.savefig("{}_nlags_{}.png".format(file, len(data[0]["auto_data"]) - 1))
 
 
-def autocorrelation(dir, data, data_feature_output, n_lags, partial=False):
+def autocorrelation(dir, data, data_feature_output, n_lags, epoch, partial=False):
     """
     args:
     :param dataset: dataset name
@@ -169,7 +175,7 @@ def autocorrelation(dir, data, data_feature_output, n_lags, partial=False):
             for i in range(len(data_feature)):
                 len_seq = np.count_nonzero(data_gen_flag[i, :])
                 if partial:
-                    if (len_seq//2) <= n_lags:
+                    if (len_seq // 2) <= n_lags:
                         continue
                 else:
                     if len_seq < n_lags:
@@ -182,7 +188,7 @@ def autocorrelation(dir, data, data_feature_output, n_lags, partial=False):
                         continue
 
                 else:
-                    auto += autocorr(data_feature[i, :len_seq+1], n_lags)
+                    auto += autocorr(data_feature[i, :len_seq + 1], n_lags)
                     counter += 1
             if counter != 0:
                 auto /= counter
@@ -195,6 +201,9 @@ def autocorrelation(dir, data, data_feature_output, n_lags, partial=False):
             file = "{0}/partial_auto_feature_{1}".format(dir, feature_dim)
         else:
             file = "{0}/auto_feature_{1}".format(dir, feature_dim)
+        if not os.path.exists(file):
+            os.makedirs(file)
+        file = "{}/epoch_{}".format(file, epoch)
         plot_auto(data=data_to_plot, file=file, partial=partial)
         feature_dim += f.dim
 
@@ -211,7 +220,7 @@ def plot_seq_len(data, file):
     plt.savefig('{0}.png'.format(file))
 
 
-def sequence_length(dir, data):
+def sequence_length(dir, data, epoch):
     """
     :param dataset: dataset name
     :param data: List of dictionaries (one dictionary per features with keys 'data_gen_flag', 'name' and 'color')
@@ -224,6 +233,9 @@ def sequence_length(dir, data):
         data_bins = np.bincount(len)
         data_to_plot.append({"data_bins": data_bins, "name": set['name'], "color": set['color']})
     file = "{0}/sequence_length".format(dir)
+    if not os.path.exists(file):
+        os.makedirs(file)
+    file = "{}/epoch_{}".format(file, epoch)
     plot_seq_len(data_to_plot, file)
 
 
@@ -298,6 +310,9 @@ def cross_measurement(dir, data, nr_bins):
                 # pearsons /= data_feature.shape[0]
                 data_to_plot.append({"pdf": pearsons, 'name': set['name'], 'color': set['color']})
             file = "{0}/cross_meas_feature{1}_feature{2}".format(dir, f_1, f_2)
+            if not os.path.exists(file):
+                os.makedirs(file)
+            file = "{}/epoch_{}".format(file, epoch)
             plot_cdf(data=data_to_plot, file=file)
 
 
@@ -321,7 +336,7 @@ def plot_distribution(data, file, title, normalization=None):
 
     else:
         x_ticks = np.arange(0, len(bins), 1)
-        x_labels = np.arange(1, len(bins)+1, 1)
+        x_labels = np.arange(1, len(bins) + 1, 1)
     plt.xticks(x_ticks, x_labels)
     plt.savefig('{0}.png'.format(file))
 
@@ -355,7 +370,7 @@ def plot_distribution_2(data, file, title, normalization=None):
     plt.savefig('{0}.png'.format(file))
 
 
-def measurement_distribution(dir, data, feature_output, nr_bins=100):
+def measurement_distribution(dir, data, feature_output, epoch, nr_bins=100):
     dim = 0
     counter = 0
     for f in feature_output:
@@ -395,12 +410,15 @@ def measurement_distribution(dir, data, feature_output, nr_bins=100):
             data_to_plot.append({'bins': bins, 'name': set['name'], 'color': set['color']})
         dim += f.dim
         file = "{0}/meas_dis_feature_{1}".format(dir, counter)
+        if not os.path.exists(file):
+            os.makedirs(file)
+        file = "{}/epoch_{}".format(file, epoch)
         plot_distribution(data=data_to_plot, file=file,
                           title="measurement_distribution", normalization=f.normalization)
         counter += 1
 
 
-def metadata_distribution(dir, data, attribute_output):
+def metadata_distribution(dir, data, attribute_output, epoch):
     """
     :param data: List of dictionaries (one dictionary per features with keys 'data_attribute', 'name' and 'color')
     :param attribute_output: description of attributes
@@ -421,7 +439,10 @@ def metadata_distribution(dir, data, attribute_output):
             data_attribute = one_hot
             bins = np.sum(data_attribute, axis=0)
             data_to_plot.append({'bins': bins, 'name': set['name'], 'color': set['color']})
-        file = "{0}/meta_dis_attribute_{1}".format(dir, counter)
+        file = "{}/meta_dis_attribute_{}/epoch_{}".format(dir, counter, epoch)
+        if not os.path.exists(file):
+            os.makedirs(file)
+        file = "{}/epoch_{}".format(file, epoch)
         plot_distribution(data=data_to_plot, file=file,
                           title="metadata_distribution")
         dim += i.dim
@@ -544,7 +565,7 @@ def meta_meas_corr(dir, data, data_attribute_outputs, data_feature_outputs, plot
 # TODO: find out squared error of what exactly
 # always calculate and display top 3 nearest neighbors for 3 samples
 # does not work for discrete features
-def plot_nearest_neighbors(data, file, real_data_features, sampled_data_features, feature_dim):
+def plot_nearest_neighbors(data, file, real_data_features, sampled_data_features, feature_dim, epoch):
     fig, axs = plt.subplots(3, 4, figsize=(12, 4))
     plt.tight_layout()
     axs[0, 0].set_title('Gen. Sample')
@@ -588,6 +609,9 @@ def nearest_neighbors(dir, real_data_features, sampled_data_features, data_featu
             dist_ind = np.argsort(dist)
             data_to_plot.append({"sample_index": sample_nr, "nn_indices": dist_ind})
         file = "{0}/NN_feature_{1}".format(dir, f)
+        if not os.path.exists(file):
+            os.makedirs(file)
+        file = "{}/epoch_{}".format(file, epoch)
         plot_nearest_neighbors(data=data_to_plot, file=file,
                                real_data_features=real_data_features, sampled_data_features=sampled_data_features,
                                feature_dim=f)
@@ -628,7 +652,7 @@ def mse_autocorrelation(dir, real_data_features, sample_data_features, data_feat
 
 # load web dataset for testing
 fake_data = True
-w_lambert = False
+w_lambert = True
 kernel_smoothing = None
 
 datasets = [{'name': "FCC_MBA", 'auto': [(15, False), (8, True)]}]
@@ -639,9 +663,9 @@ datasets = [
     {'name': "index_growth_range_12mo", 'auto': [(200, False), (150, True)]}
     ]
 """
-eval_metrics = ['auto', 'measurement', 'metadata', 'embedding', 'QQ', 'NN']
+eval_metrics = ['auto', 'seq_len', 'measurement', 'QQ']
 normalize = True
-gan_types = ['NaiveGAN']
+gan_types = ['Gen_TRANSFORMER_Dis_TRANSFORMER']
 embedding_metrics = ['TSNE', 'PCA']
 qq_metrics = ['mean', 'variance', 'skewness', 'kurtosis']
 
@@ -670,7 +694,7 @@ for dataset in datasets:
         eval_dir = "{}_ks_{}".format(eval_dir, kernel_smoothing)
     if fake_data:
         for gan_type in gan_types:
-            for i in range(2, 3):
+            for i in range(7, 8):
                 for n in range(0, 420, 20):
                     sample_path = 'runs/{}/{}/{}/checkpoint/epoch_{}/generated_samples.npz'.format(dataset['name'],
                                                                                                    gan_type, i, n)
@@ -688,18 +712,18 @@ for dataset in datasets:
                         'color': 'blue',
                         'name': gan_type
                     })
-                    dir = "{}/{}/{}/epoch_{}".format(eval_dir, gan_type, i, n)
+                    dir = "{}/{}/{}".format(eval_dir, gan_type, i)
                     if not os.path.exists(dir):
                         os.makedirs(dir)
                     # call methods
                     if 'metadata' in eval_metrics:
-                        metadata_distribution(dir=dir, data=data, attribute_output=data_attribute_outputs)
+                        metadata_distribution(dir=dir, data=data, attribute_output=data_attribute_outputs, epoch=n)
                     if 'seq_len' in eval_metrics:
-                        sequence_length(dir=dir, data=data)
+                        sequence_length(dir=dir, data=data, epoch=n)
                     if 'cross_meas' in eval_metrics:
-                        cross_measurement(dir=dir, data=data, nr_bins=100)
+                        cross_measurement(dir=dir, data=data, nr_bins=100, epoch=n)
                     if 'measurement' in eval_metrics:
-                        measurement_distribution(dir=dir, data=data, feature_output=data_feature_outputs)
+                        measurement_distribution(dir=dir, data=data, feature_output=data_feature_outputs, epoch=n)
                     if 'EMD' in eval_metrics:
                         emd(dir=dir, data=data, data_feature_output=data_feature_outputs, epoch=n)
                     if 'auto' in eval_metrics:
@@ -713,21 +737,21 @@ for dataset in datasets:
                             else:
                                 n_lags = metric[0]
                             autocorrelation(dir=dir, data=data, data_feature_output=data_feature_outputs,
-                                            n_lags=n_lags, partial=partial)
+                                            n_lags=n_lags, partial=partial, epoch=n)
                     if 'NN' in eval_metrics:
                         nearest_neighbors(dir=dir, real_data_features=data_feature,
                                           sampled_data_features=sampled_features,
-                                          data_feature_outputs=data_feature_outputs)
-                    if "meta_meas" in eval_metrics:
-                        meta_meas_corr(dir=dir, data=data, data_attribute_outputs=data_attribute_outputs,
-                                       data_feature_outputs=data_feature_outputs)
+                                          data_feature_outputs=data_feature_outputs, epoch=n)
+                    # meta_meas_corr(dir=evaluation_dir, data=data, data_attribute_outputs=data_attribute_outputs,
+                    #                data_feature_outputs=data_feature_outputs)
                     if 'embedding' in eval_metrics:
                         for metric in embedding_metrics:
                             embedding(dir=dir, data=data, data_feature_output=data_feature_outputs,
-                                      embedding=metric)
+                                      embedding=metric, epoch=n)
                     if 'QQ' in eval_metrics:
                         for metric in qq_metrics:
-                            qq_plot(dir=dir, data=data, data_feature_output=data_feature_outputs, metric=metric)
+                            qq_plot(dir=dir, data=data, data_feature_output=data_feature_outputs, metric=metric,
+                                    epoch=n)
                     data.pop(-1)
     else:
         dir = "{}/only_real".format(eval_dir)

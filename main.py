@@ -1,7 +1,7 @@
 from torch.utils.data import DataLoader
 import torch
 from data import Data
-from trainer import DoppelGANger, CGAN, RCGAN, NAIVEGAN, TimeGAN
+from trainer import DoppelGANger, CGAN, RCGAN, NAIVEGAN, TimeGAN, TimeGAN2
 import os
 from util import options_parser
 
@@ -23,9 +23,9 @@ def main():
     if ks is not None:
         checkpoint_dir = "{}_ks_{}".format(checkpoint_dir, ks)
     if args.dis_type is None:
-        checkpoint_dir = '{}/{}/1'.format(checkpoint_dir, gan_type)
+        checkpoint_dir = '{}/{}/2'.format(checkpoint_dir, gan_type)
     else:
-        checkpoint_dir = '{}/Gan_{}_Dis_{}/1'.format(checkpoint_dir, gan_type, dis_type)
+        checkpoint_dir = '{}/Gen_{}_Dis_{}/2'.format(checkpoint_dir, gan_type, dis_type)
 
     time_logging_file = '{}/time.log'.format(checkpoint_dir)
     config_logging_file = '{}/config.log'.format(checkpoint_dir)
@@ -55,9 +55,9 @@ def main():
         trainer = CGAN(real_train_dl, device=device, batch_size=batch_size, checkpoint_dir=checkpoint_dir,
                        time_logging_file=time_logging_file, config_logging_file=config_logging_file)
     elif gan_type == 'TimeGAN':
-        trainer = TimeGAN(real_train_dl, device=device, checkpoint_dir=checkpoint_dir, batch_size=batch_size,
-                          config_logging_file=config_logging_file,
-                          time_logging_file=time_logging_file)
+        trainer = TimeGAN2(real_train_dl, device=device, checkpoint_dir=checkpoint_dir, batch_size=batch_size,
+                           config_logging_file=config_logging_file,
+                           time_logging_file=time_logging_file)
     else:
         trainer = DoppelGANger(real_train_dl=real_train_dl, device=device,
                                checkpoint_dir=checkpoint_dir, time_logging_file=time_logging_file,

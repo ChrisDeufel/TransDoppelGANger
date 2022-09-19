@@ -23,17 +23,7 @@ model.py: Network Modules
 import torch
 import torch.nn as nn
 import torch.nn.init as init
-
-
-def _weights_init(m):
-    classname = m.__class__.__name__
-    if isinstance(m, nn.Linear) or isinstance(m, nn.Conv2d):
-        init.kaiming_normal_(m.weight)
-    elif classname.find('Conv') != -1:
-        m.weight.data.normal_(0.0, 0.02)
-    elif classname.find('BatchNorm') != -1:
-        m.weight.data.normal_(1.0, 0.02)
-        m.bias.data.fill_(0)
+from gan.gan_util import init_weights
 
 
 class TGEncoder(nn.Module):
@@ -49,10 +39,10 @@ class TGEncoder(nn.Module):
 
     def __init__(self, input_size, hidden_dim=24, num_layer=3):
         super(TGEncoder, self).__init__()
-        self.rnn = nn.GRU(input_size=input_size, hidden_size=hidden_dim, num_layers=num_layer)
+        self.rnn = nn.LSTM(input_size=input_size, hidden_size=hidden_dim, num_layers=num_layer, batch_first=True)
         self.fc = nn.Linear(hidden_dim, hidden_dim)
         self.sigmoid = nn.Sigmoid()
-        self.apply(_weights_init)
+        self.apply(init_weights)
 
     def forward(self, input, sigmoid=True):
         e_outputs, _ = self.rnn(input)
@@ -76,10 +66,10 @@ class TGRecovery(nn.Module):
     def __init__(self, output_size, hidden_dim=24, num_layer=3):
         super(TGRecovery, self).__init__()
         # self.rnn = nn.GRU(input_size=hidden_dim, hidden_size=output_size, num_layers=num_layer)
-        self.rnn = nn.LSTM(input_size=hidden_dim, hidden_size=output_size, num_layers=num_layer)
+        self.rnn = nn.LSTM(input_size=hidden_dim, hidden_size=output_size, num_layers=num_layer, batch_first=True)
         self.fc = nn.Linear(output_size, output_size)
         self.sigmoid = nn.Sigmoid()
-        self.apply(_weights_init)
+        self.apply(init_weights)
 
     def forward(self, input, sigmoid=True):
         r_outputs, _ = self.rnn(input)
@@ -103,10 +93,10 @@ class TGGenerator(nn.Module):
     def __init__(self, z_dim=6, hidden_dim=24, num_layer=3):
         super(TGGenerator, self).__init__()
         # self.rnn = nn.GRU(input_size=z_dim, hidden_size=hidden_dim, num_layers=num_layer)
-        self.rnn = nn.LSTM(input_size=z_dim, hidden_size=hidden_dim, num_layers=num_layer)
+        self.rnn = nn.LSTM(input_size=z_dim, hidden_size=hidden_dim, num_layers=num_layer, batch_first=True)
         self.fc = nn.Linear(hidden_dim, hidden_dim)
         self.sigmoid = nn.Sigmoid()
-        self.apply(_weights_init)
+        self.apply(init_weights)
 
     def forward(self, input, sigmoid=True):
         g_outputs, _ = self.rnn(input)
@@ -130,10 +120,10 @@ class TGSupervisor(nn.Module):
     def __init__(self, hidden_dim=24, num_layer=3):
         super(TGSupervisor, self).__init__()
         # self.rnn = nn.GRU(input_size=hidden_dim, hidden_size=hidden_dim, num_layers=num_layer)
-        self.rnn = nn.LSTM(input_size=hidden_dim, hidden_size=hidden_dim, num_layers=num_layer)
+        self.rnn = nn.LSTM(input_size=hidden_dim, hidden_size=hidden_dim, num_layers=num_layer, batch_first=True)
         self.fc = nn.Linear(hidden_dim, hidden_dim)
         self.sigmoid = nn.Sigmoid()
-        self.apply(_weights_init)
+        self.apply(init_weights)
 
     def forward(self, input, sigmoid=True):
         s_outputs, _ = self.rnn(input)
@@ -158,10 +148,10 @@ class TGDiscriminator(nn.Module):
         super(TGDiscriminator, self).__init__()
         # self.rnn = nn.GRU(input_size=hidden_dim, hidden_size=int(hidden_dim/2), num_layers=num_layer, bidirectional=True)
         self.rnn = nn.LSTM(input_size=hidden_dim, hidden_size=int(hidden_dim / 2), num_layers=num_layer,
-                          bidirectional=True)
+                          bidirectional=True, batch_first=True)
         self.fc = nn.Linear(hidden_dim, 1)
         self.sigmoid = nn.Sigmoid()
-        self.apply(_weights_init)
+        self.apply(init_weights)
 
     def forward(self, input, sigmoid=True):
         d_outputs, _ = self.rnn(input)

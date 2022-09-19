@@ -14,6 +14,24 @@ import matplotlib.pyplot as plt
 import logging
 import argparse
 
+def evaluation(sampled_data, dataset, epoch):
+    data = []
+    # append real data
+    data.append({
+        'data_feature': dataset.data_feature,
+        'data_attribute': dataset.data_attribute,
+        'data_gen_flag': dataset.data_gen_flag,
+        'color': 'yellow',
+        'name': 'REAL'
+    })
+    data.append({
+        'data_feature': sampled_data['sampled_features'],
+        'data_attribute': sampled_data['sampled_attributes'],
+        'data_gen_flag': sampled_data['sampled_gen_flags'],
+        'data_lengths': sampled_data['sampled_lengths'],
+        'color': 'blue',
+        'name': gan_type
+    })
 
 def add_handler(logger, handlers):
     for handler in handlers:
@@ -238,16 +256,18 @@ def normalize_per_sample(data_feature, data_attribute, data_feature_outputs,
 
                 additional_attribute.append((max_ + min_) / 2.0)
                 additional_attribute.append((max_ - min_) / 2.0)
-                additional_attribute_outputs.append(Output(
-                    type_=OutputType.CONTINUOUS,
-                    dim=1,
-                    normalization=Normalization.MINUSONE_ONE,
-                    is_gen_flag=False))
-                additional_attribute_outputs.append(Output(
-                    type_=OutputType.CONTINUOUS,
-                    dim=1,
-                    normalization=Normalization.ZERO_ONE,
-                    is_gen_flag=False))
+                if output.normalization == Normalization.MINUSONE_ONE:
+                    additional_attribute_outputs.append(Output(
+                        type_=OutputType.CONTINUOUS,
+                        dim=1,
+                        normalization=Normalization.MINUSONE_ONE,
+                        is_gen_flag=False))
+                else:
+                    additional_attribute_outputs.append(Output(
+                        type_=OutputType.CONTINUOUS,
+                        dim=1,
+                        normalization=Normalization.ZERO_ONE,
+                        is_gen_flag=False))
 
                 max_ = np.expand_dims(max_, axis=1)
                 min_ = np.expand_dims(min_, axis=1)

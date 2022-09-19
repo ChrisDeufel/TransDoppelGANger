@@ -32,8 +32,8 @@ class Data(Dataset):
                                                                         self.data_feature_outputs, sample_len)
         self.data_feature_shape = self.data_feature.shape
         self.data_attribute_shape = self.data_attribute.shape
-        np.save("data/{}/data_feature_n_g.npy".format(name), self.data_feature)
-        np.save("data/{}/data_attribute_n_g.npy".format(name), self.data_attribute)
+        # np.save("data/{}/data_feature_n_g.npy".format(name), self.data_feature)
+        # np.save("data/{}/data_attribute_n_g.npy".format(name), self.data_attribute)
 
     def __getitem__(self, idx):
         attribute = torch.Tensor(self.data_attribute[idx, :])

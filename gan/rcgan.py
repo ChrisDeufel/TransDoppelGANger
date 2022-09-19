@@ -54,13 +54,16 @@ class RGANGenerator(nn.Module):
                            hidden_size=hidden_size,
                            num_layers=num_layers)
         self.linear = nn.Linear(hidden_size, output_size)
+        self.sigmoid = nn.Sigmoid()
         # Initialize all weights.
         self.rnn.apply(init_weights)
         self.linear.apply(init_weights)
 
-    def forward(self, z):
+    def forward(self, z, sigmoid=True):
         y, _ = self.rnn(z)
         y = self.linear(y)
+        if sigmoid:
+            y = self.sigmoid(y)
         return y
 
 
