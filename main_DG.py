@@ -6,6 +6,7 @@ import os
 from util import options_parser
 
 
+
 def main():
     parser = options_parser()
     args = parser.parse_args()
@@ -33,8 +34,8 @@ def main():
         os.makedirs(checkpoint_dir)
 
     sample_len = int(args.sample_len)
-    batch_size = args.batch_size
 
+    batch_size = args.batch_size
     # load data
     dataset = Data(sample_len=sample_len, name=dataset, w_lambert=wl, ks=ks)
     real_train_dl = DataLoader(dataset=dataset, batch_size=batch_size, shuffle=True)
@@ -56,8 +57,8 @@ def main():
                        time_logging_file=time_logging_file, config_logging_file=config_logging_file)
     elif gan_type == 'TimeGAN':
         trainer = TimeGAN2(real_train_dl, device=device, checkpoint_dir=checkpoint_dir, batch_size=batch_size,
-                          config_logging_file=config_logging_file,
-                          time_logging_file=time_logging_file)
+                           config_logging_file=config_logging_file,
+                           time_logging_file=time_logging_file)
     else:
         trainer = DoppelGANger(real_train_dl=real_train_dl, device=device,
                                checkpoint_dir=checkpoint_dir, time_logging_file=time_logging_file,

@@ -3,12 +3,12 @@ from statistics import mean
 import torch.nn as nn
 import torch.optim as optim
 import torch
-from torch.utils.tensorboard import SummaryWriter
+# from torch.utils.tensorboard import SummaryWriter
 import os
 from gan.network import AttrDiscriminator, Discriminator, DoppelGANgerGeneratorRNN, DoppelGANgerGeneratorAttention, \
     TransformerDiscriminator
 from gan.cgan import CGANGenerator, CGANDiscriminator
-from gan.rcgan import RGANGenerator, RGANDiscriminator
+from gan.rcgan import RGANGenerator, RGANDiscriminator, RCGANGenerator2, RCGANDiscriminator2
 from gan.timegan import TGEncoder, TGRecovery, TGGenerator, TGDiscriminator, TGSupervisor
 from gan.naivegan import NaiveGanGenerator, NaiveGanDiscriminator
 
@@ -44,19 +44,21 @@ class DoppelGANger:
                  ):
         self.config_logger, self.time_logger = setup_logging(time_logging_file, config_logging_file)
         # setup models
-        if dis_type == 'TRANSFORMER':
-            self.dis = TransformerDiscriminator(input_feature_shape=real_train_dl.dataset.data_feature_shape,
-                                                input_attribute_shape=real_train_dl.dataset.data_attribute_shape)
-        else:
+        if dis_type == 'MLP':
             self.dis = Discriminator(real_train_dl.dataset.data_feature_shape,
                                      real_train_dl.dataset.data_attribute_shape)
+        else:
+            self.dis = TransformerDiscriminator(input_feature_shape=real_train_dl.dataset.data_feature_shape,
+                                                input_attribute_shape=real_train_dl.dataset.data_attribute_shape)
         self.config_logger.info("DISCRIMINATOR: {0}".format(self.dis))
         self.attr_dis = AttrDiscriminator(real_train_dl.dataset.data_attribute_shape)
         self.config_logger.info("ATTRIBUTE DISCRIMINATOR: {0}".format(self.attr_dis))
+
         if gen_type == 'RNN':
             noise_dim = noise_dim
         else:
             noise_dim = att_dim - real_train_dl.dataset.data_attribute.shape[1]
+
         if gen_type == "RNN":
             self.gen = DoppelGANgerGeneratorRNN(noise_dim=noise_dim,
                                                 feature_outputs=real_train_dl.dataset.data_feature_outputs,
@@ -106,7 +108,7 @@ class DoppelGANger:
         self.checkpoint_dir = checkpoint_dir
         if not os.path.exists(checkpoint_dir):
             os.makedirs(checkpoint_dir)
-        self.writer = SummaryWriter(checkpoint_dir)
+        self.writer = None
         self.device = device
         self.config_logger.info("Device: {0}".format(self.device))
         self.dis = self.dis.to(self.device)
@@ -301,20 +303,20 @@ class DoppelGANger:
         #                                       torch.randn(1, self.sample_time, self.noise_dim).to(self.device)])
 
         # create all running losses (rl) dict
-        running_losses = {
-            "dis_total_rl": 0,
-            "dis_wogp_rl": 0,
-            "dis_fake_rl": 0,
-            "dis_real_rl": 0,
-            "dis_gp_rl": 0,
-            "attr_dis_rl": 0,
-            "attr_dis_fake_rl": 0,
-            "attr_dis_real_rl": 0,
-            "attr_dis_gp_rl": 0,
-            "gen_rl": 0,
-            "gen_d_rl": 0,
-            "gen_attr_d_rl": 0
-        }
+        # running_losses = {
+        #     "dis_total_rl": 0,
+        #     "dis_wogp_rl": 0,
+        #     "dis_fake_rl": 0,
+        #     "dis_real_rl": 0,
+        #     "dis_gp_rl": 0,
+        #     "attr_dis_rl": 0,
+        #     "attr_dis_fake_rl": 0,
+        #     "attr_dis_real_rl": 0,
+        #     "attr_dis_gp_rl": 0,
+        #     "gen_rl": 0,
+        #     "gen_d_rl": 0,
+        #     "gen_attr_d_rl": 0
+        # }
         avg_mmd = []
         n_total_steps = len(self.real_train_dl)
         for epoch in range(epochs):
@@ -342,7 +344,7 @@ class DoppelGANger:
 
                     loss_dis_fake = torch.mean(dis_fake)
                     loss_dis_real = -torch.mean(dis_real)
-                    running_losses["dis_wogp_rl"] += (loss_dis_fake + loss_dis_real).item()
+                    # running_losses["dis_wogp_rl"] += (loss_dis_fake + loss_dis_real).item()
 
                     # calculate gradient penalty
                     loss_dis_gp, loss_dis_gp_unflattened = self.calculate_gp_dis(batch_size, fake_feature, data_feature,
@@ -352,10 +354,10 @@ class DoppelGANger:
                     loss_dis.backward(retain_graph=True)
                     self.dis_opt.step()
 
-                    running_losses["dis_total_rl"] += loss_dis.item()
-                    running_losses["dis_fake_rl"] += loss_dis_fake.item()
-                    running_losses["dis_real_rl"] += loss_dis_real.item()
-                    running_losses["dis_gp_rl"] += loss_dis_gp.item()
+                    # running_losses["dis_total_rl"] += loss_dis.item()
+                    # running_losses["dis_fake_rl"] += loss_dis_fake.item()
+                    # running_losses["dis_real_rl"] += loss_dis_real.item()
+                    # running_losses["dis_gp_rl"] += loss_dis_gp.item()
 
                     # attribute discriminator
                     attr_dis_real = self.attr_dis(data_attribute)
@@ -372,10 +374,10 @@ class DoppelGANger:
                     loss_attr_dis.backward(retain_graph=True)
                     self.attr_dis_opt.step()
 
-                    running_losses["attr_dis_rl"] += loss_attr_dis.item()
-                    running_losses["attr_dis_fake_rl"] += loss_attr_dis_fake.item()
-                    running_losses["attr_dis_real_rl"] += loss_attr_dis_real.item()
-                    running_losses["attr_dis_gp_rl"] += loss_attr_dis_gp.item()
+                    # running_losses["attr_dis_rl"] += loss_attr_dis.item()
+                    # running_losses["attr_dis_fake_rl"] += loss_attr_dis_fake.item()
+                    # running_losses["attr_dis_real_rl"] += loss_attr_dis_real.item()
+                    # running_losses["attr_dis_gp_rl"] += loss_attr_dis_gp.item()
 
                 # Train Generator: max E[critic(gen_fake)] <-> min -E[critic(gen_fake)]
                 for _ in range(self.g_rounds):
@@ -388,13 +390,13 @@ class DoppelGANger:
                     loss_gen.backward()
                     self.gen_opt.step()
 
-                    running_losses["gen_d_rl"] += loss_gen_d.item()
-                    running_losses["gen_attr_d_rl"] += loss_gen_attr_d.item()
-                    running_losses["gen_rl"] += loss_gen.item()
+                    # running_losses["gen_d_rl"] += loss_gen_d.item()
+                    # running_losses["gen_attr_d_rl"] += loss_gen_attr_d.item()
+                    # running_losses["gen_rl"] += loss_gen.item()
                     # write losses to summary writer
-                    if (batch_idx + 1) % writer_frequency == 0:
-                        running_losses = self.add_losses(running_losses, writer_frequency, epoch, n_total_steps,
-                                                         batch_idx)
+                    # if (batch_idx + 1) % writer_frequency == 0:
+                    #     running_losses = self.add_losses(running_losses, writer_frequency, epoch, n_total_steps,
+                    #                                      batch_idx)
             self.time_logger.info('END OF EPOCH {0}'.format(epoch))
             avg_mmd.append(np.asarray(mmd).mean())
             # save model
@@ -402,7 +404,7 @@ class DoppelGANger:
                 self.save(epoch)
                 self.inference(epoch)
         np.save("{}/mmd.npy".format(self.checkpoint_dir), np.asarray(avg_mmd))
-        self.writer.close()
+        # self.writer.close()
 
 
 class CGAN:
@@ -516,7 +518,7 @@ class CGAN:
                 if argmax == 0:
                     gen_flags[i, :] = 1
                 else:
-                    gen_flags[i, :argmax+1] = 1
+                    gen_flags[i, :argmax + 1] = 1
                 lengths[i] = argmax
             if not return_gen_flag_feature:
                 features = features[:, :, :-2]
@@ -676,7 +678,7 @@ class NAIVEGAN:
                 if argmax == 0:
                     gen_flags[i, :] = 1
                 else:
-                    gen_flags[i, :argmax+1] = 1
+                    gen_flags[i, :argmax + 1] = 1
                 lengths[i] = argmax
             if not return_gen_flag_feature:
                 features = features[:, :, :-2]
@@ -728,10 +730,8 @@ class NAIVEGAN:
         np.save("{}/mmd.npy".format(self.checkpoint_dir), np.asarray(avg_mmd))
 
 
-
 class TimeGAN:
-    #TimeGAN Class
-    
+    # TimeGAN Class
 
     @property
     def name(self):
@@ -875,7 +875,7 @@ class TimeGAN:
             if argmax == 0:
                 gen_flags[i, :] = 1
             else:
-                gen_flags[i, :argmax+1] = 1
+                gen_flags[i, :argmax + 1] = 1
             lengths[i] = argmax
         if not return_gen_flag_feature:
             features = features[:, :, :-2]
@@ -888,7 +888,7 @@ class TimeGAN:
 
     def train(self, epochs, writer_frequency=1, saver_frequency=10):
         # Train the model
-        
+
         self.nete.train()
         self.netr.train()
         self.netg.train()
@@ -955,6 +955,173 @@ class TimeGAN:
         np.save("{}/mmd.npy".format(self.checkpoint_dir), np.asarray(avg_mmd))
 
 
+class RCGAN2:
+
+    @property
+    def name(self):
+        return 'CGAN'
+
+    def __init__(self,
+                 train_loader,
+                 device,
+                 batch_size=28,
+                 lr=0.0001,
+                 noise_dim=30,
+                 num_units_dis=100,
+                 num_units_gen=200,
+                 num_layers=3,
+                 beta1=0.5,
+                 alpha=0.1,
+                 checkpoint_dir='',
+                 time_logging_file='',
+                 config_logging_file=''):
+        self.config_logger, self.time_logger = setup_logging(time_logging_file, config_logging_file)
+        # setup models
+        self.device = device
+        self.real_train_dl = train_loader
+        self.checkpoint_dir = checkpoint_dir
+        self.noise_dim = noise_dim
+        self.generator = RCGANGenerator2(input_feature_shape=train_loader.dataset.data_feature_shape,
+                                         input_attribute_shape=train_loader.dataset.data_attribute_shape,
+                                         noise_dim=noise_dim, num_units=num_units_gen, num_layers=num_layers,
+                                         alpha=alpha)
+        self.discriminator = RCGANDiscriminator2(input_feature_shape=train_loader.dataset.data_feature_shape,
+                                                 input_attribute_shape=train_loader.dataset.data_attribute_shape,
+                                                 num_units=num_units_dis, num_layers=num_layers, alpha=alpha)
+        self.generator = self.generator.to(self.device)
+        self.discriminator = self.discriminator.to(self.device)
+        self.config_logger.info("DISCRIMINATOR: {0}".format(self.discriminator))
+        self.config_logger.info("GENERATOR: {0}".format(self.generator))
+        # loss
+        self.criterion = nn.BCELoss()
+        self.config_logger.info("Criterion: {0}".format(self.criterion))
+        # Setup optimizer
+        self.optimizer_gen = optim.Adam(self.generator.parameters(), lr=lr, betas=(beta1, 0.999))
+        self.optimizer_dis = optim.Adam(self.discriminator.parameters(), lr=lr, betas=(beta1, 0.999))
+        self.config_logger.info("DISCRIMINATOR OPTIMIZER: {0}".format(self.optimizer_dis))
+        self.config_logger.info("GENERATOR OPTIMIZER: {0}".format(self.optimizer_gen))
+        self.batch_size = batch_size
+        self.config_logger.info("Batch Size: {0}".format(self.batch_size))
+        self.config_logger.info("Noise Dimension: {0}".format(self.noise_dim))
+        self.config_logger.info("d_rounds: {0}".format("1"))
+        self.config_logger.info("g_rounds: {0}".format("1"))
+        self.config_logger.info("Device: {0}".format(self.device))
+
+    def save(self, epoch):
+        if not os.path.exists("{0}/epoch_{1}".format(self.checkpoint_dir, epoch)):
+            os.makedirs("{0}/epoch_{1}".format(self.checkpoint_dir, epoch))
+        torch.save(self.generator, "{0}/epoch_{1}/generator.pth".format(self.checkpoint_dir, epoch))
+        torch.save(self.discriminator, "{0}/epoch_{1}/discriminator.pth".format(self.checkpoint_dir, epoch))
+
+    def load(self, model_dir=None):
+        if not os.path.exists(model_dir):
+            raise Exception("Directory to load pytorch model doesn't exist")
+        self.generator = torch.load("{0}/generator.pth".format(model_dir))
+        self.discriminator = torch.load("{0}/discriminator.pth".format(model_dir))
+        self.generator = self.generator.to(self.device)
+        self.discriminator = self.discriminator.to(self.device)
+
+    def inference(self, epoch, model_dir=None):
+        if model_dir is None:
+            model_dir = "{0}/epoch_{1}".format(self.checkpoint_dir, epoch)
+        batch_size = self.batch_size
+
+        while self.real_train_dl.dataset.data_attribute_shape[0] % batch_size != 0:
+            batch_size -= 1
+        rounds = self.real_train_dl.dataset.data_attribute_shape[0] // batch_size
+        sampled_features = np.zeros((0, self.real_train_dl.dataset.data_feature_shape[1],
+                                     self.real_train_dl.dataset.data_feature_shape[2] - 2))
+        sampled_attributes = np.zeros((0, self.real_train_dl.dataset.data_attribute_shape[1]))
+        sampled_gen_flags = np.zeros((0, self.real_train_dl.dataset.data_feature_shape[1]))
+        sampled_lengths = np.zeros(0)
+        for i in range(rounds):
+            features, attributes, gen_flags, lengths = self.sample_from(batch_size=batch_size)
+            sampled_features = np.concatenate((sampled_features, features), axis=0)
+            sampled_attributes = np.concatenate((sampled_attributes, attributes), axis=0)
+            sampled_gen_flags = np.concatenate((sampled_gen_flags, gen_flags), axis=0)
+            sampled_lengths = np.concatenate((sampled_lengths, lengths), axis=0)
+        np.savez("{0}/generated_samples.npz".format(model_dir), sampled_features=sampled_features,
+                 sampled_attributes=sampled_attributes, sampled_gen_flags=sampled_gen_flags,
+                 sampled_lengths=sampled_lengths)
+
+    def sample_from(self, batch_size, return_gen_flag_feature=False):
+        self.discriminator.eval()
+        self.generator.eval()
+        noise = gen_noise((batch_size, self.noise_dim)).to(self.device)
+
+        attributes, data_feature = next(iter(self.real_train_dl))
+        attributes = attributes.to(self.device)
+        attributes = attributes[:batch_size, :]
+        input_gen = torch.cat((attributes, noise), dim=1)
+        with torch.no_grad():
+            features = self.generator(input_gen)
+            features = torch.reshape(features, (batch_size,
+                                                self.real_train_dl.dataset.data_feature_shape[1],
+                                                self.real_train_dl.dataset.data_feature_shape[2]))
+            features = features.cpu().numpy()
+            gen_flags = np.zeros(features.shape[:-1])
+            lengths = np.zeros(features.shape[0])
+            for i in range(len(features)):
+                winner = (features[i, :, -1] > features[i, :, -2])
+                argmax = np.argmax(winner == True)
+                if argmax == 0:
+                    gen_flags[i, :] = 1
+                else:
+                    gen_flags[i, :argmax + 1] = 1
+                lengths[i] = argmax
+            if not return_gen_flag_feature:
+                features = features[:, :, :-2]
+        return features, attributes.cpu().numpy(), gen_flags, lengths
+
+    def train(self, epochs, writer_frequency=1, saver_frequency=20):
+        avg_mmd = []
+        for epoch in range(epochs):
+            mmd = []
+            for batch_idx, (data_attribute, data_feature) in enumerate(self.real_train_dl):
+                data_attribute = data_attribute.to(self.device)
+                data_feature = data_feature.to(self.device)
+                data_feature = torch.flatten(data_feature, start_dim=1, end_dim=2)
+                batch_size = data_attribute.shape[0]
+                real = torch.cat((data_attribute, data_feature), dim=1)
+                noise = gen_noise((batch_size, self.noise_dim)).to(self.device)
+                input_gen = torch.cat((data_attribute, noise), dim=1)
+
+                ### Train Discriminator: max log(D(x)) + log(1 - D(G(z)))
+                fake = self.generator(input_gen)
+                mmd_fake = torch.reshape(fake, (batch_size,
+                                                self.real_train_dl.dataset.data_feature_shape[1],
+                                                self.real_train_dl.dataset.data_feature_shape[2]))
+                mmd_real = torch.reshape(data_feature, (batch_size,
+                                                        self.real_train_dl.dataset.data_feature_shape[1],
+                                                        self.real_train_dl.dataset.data_feature_shape[2]))
+                mmd.append(calculate_mmd_rbf(torch.mean(mmd_fake, dim=0).detach().cpu().numpy(),
+                                             torch.mean(mmd_real, dim=0).detach().cpu().numpy()))
+                fake = torch.cat((data_attribute, fake), dim=1)
+                disc_real = self.discriminator(real).view(-1)
+                lossD_real = self.criterion(disc_real, torch.ones_like(disc_real))
+                disc_fake = self.discriminator(fake).view(-1)
+                lossD_fake = self.criterion(disc_fake, torch.zeros_like(disc_fake))
+                lossD = (lossD_real + lossD_fake) / 2
+                self.discriminator.zero_grad()
+                lossD.backward(retain_graph=True)
+                self.optimizer_dis.step()
+
+                ### Train Generator: min log(1 - D(G(z))) <-> max log(D(G(z))
+                output = self.discriminator(fake).view(-1)
+                lossG = self.criterion(output, torch.ones_like(output))
+                self.generator.zero_grad()
+                lossG.backward()
+                self.optimizer_gen.step()
+            avg_mmd.append(mean(mmd))
+            self.time_logger.info('END OF EPOCH {0}'.format(epoch))
+            if epoch % saver_frequency == 0:
+                self.save(epoch)
+                self.inference(epoch)
+                self.generator.train()
+                self.discriminator.train()
+        np.save("{}/mmd.npy".format(self.checkpoint_dir), np.asarray(avg_mmd))
+
+
 class RCGAN:
     """RCGAN Class
     """
@@ -966,7 +1133,7 @@ class RCGAN:
     def __init__(self,
                  train_loader,
                  device,
-                 lr=0.1,
+                 lr=0.001,
                  noise_dim=5,
                  batch_size=28,
                  hidden_size_gen=100,
@@ -996,10 +1163,11 @@ class RCGAN:
             self.generator = RGANGenerator(sequence_length=self.sequence_length,
                                            output_size=num_features,
                                            hidden_size=hidden_size_gen, noise_size=self.noise_dim + self.attribute_size,
-                                           num_layers=num_layer_gen)
+                                           num_layers=num_layer_gen, device=self.device)
             self.discriminator = RGANDiscriminator(sequence_length=self.sequence_length,
                                                    input_size=self.attribute_size + num_features,
-                                                   hidden_size=hidden_size_dis, num_layers=num_layer_dis)
+                                                   hidden_size=hidden_size_dis, num_layers=num_layer_dis,
+                                                   device=self.device)
         else:
             self.generator = RGANGenerator(sequence_length=self.sequence_length, output_size=num_features,
                                            hidden_size=hidden_size_gen, noise_size=self.noise_dim,
@@ -1087,7 +1255,7 @@ class RCGAN:
                 if argmax == 0:
                     gen_flags[i, :] = 1
                 else:
-                    gen_flags[i, :argmax+1] = 1
+                    gen_flags[i, :argmax + 1] = 1
                 lengths[i] = argmax
             if not return_gen_flag_feature:
                 features = features[:, :, :-2]
@@ -1275,9 +1443,10 @@ class TimeGAN2:
     def sample_from(self, batch_size, return_gen_flag_feature=False):
         ## Synthetic data generation
         Z = gen_noise((batch_size, self.real_train_dl.dataset.data_feature_shape[1], self.z_dim)).to(self.device)
-        E_hat = self.netg(Z)  # [?, 24, 24]
-        H_hat = self.nets(E_hat)  # [?, 24, 24]
-        features = self.netr(H_hat)  # [?, 24, 24]
+        # E_hat = self.netg(Z)
+        # H_hat = self.nets(E_hat)
+        # features = self.netr(H_hat)
+        features = self.generate_fake_feature(Z)
         features = features.detach().cpu().numpy()
         attributes = torch.zeros((batch_size, self.real_train_dl.dataset.data_attribute_shape[1]))
         gen_flags = np.zeros(features.shape[:-1])
@@ -1288,14 +1457,14 @@ class TimeGAN2:
             if argmax == 0:
                 gen_flags[i, :] = 1
             else:
-                gen_flags[i, :argmax+1] = 1
+                gen_flags[i, :argmax + 1] = 1
             lengths[i] = argmax
         if not return_gen_flag_feature:
             features = features[:, :, :-2]
         return features, attributes.cpu().numpy(), gen_flags, lengths
 
     def train_one_iter_er(self, data_feature):
-        
+
         self.nete.train()
         self.netr.train()
         X = data_feature
@@ -1313,7 +1482,7 @@ class TimeGAN2:
         self.optimizer_er.step()
 
     def train_one_iter_er_2(self, data_feature):
-        
+
         X = data_feature
         # Forward-pass
         H = self.nete(X)
@@ -1332,7 +1501,7 @@ class TimeGAN2:
         self.optimizer_er.step()
 
     def train_one_iter_s(self, data_feature):
-        
+
         # set mini-batch
         X = data_feature
         # Forward-pass
@@ -1345,14 +1514,14 @@ class TimeGAN2:
         self.optimizer_gs.step()
 
     def train_one_iter_g(self, data_feature):
-        
+
         self.batch_size = data_feature.shape[0]
 
         # set mini-batch
         X = data_feature
         Z = gen_noise((self.batch_size, data_feature.shape[1], self.z_dim)).to(self.device)
-        #with autograd.detect_anomaly():
-        #autograd.set_detect_anomaly(True)
+        # with autograd.detect_anomaly():
+        # autograd.set_detect_anomaly(True)
         # Forward-pass
         H = self.nete(X)
         H_supervise = self.nets(H)
@@ -1414,7 +1583,6 @@ class TimeGAN2:
 
     def train(self, epochs, writer_frequency=1, saver_frequency=10):
         # Train the model
-        
         self.nete.train()
         self.netr.train()
         self.netg.train()
@@ -1438,7 +1606,7 @@ class TimeGAN2:
 
         self.time_logger.info('Start Joint Training')
         avg_mmd = []
-        for iter in range(epochs*2):
+        for iter in range(epochs * 2):
             self.nete.train()
             self.netr.train()
             self.netg.train()
@@ -1450,7 +1618,7 @@ class TimeGAN2:
                 Z = gen_noise((data_feature.shape[0], data_feature.shape[1], self.z_dim)).to(self.device)
                 fake_feature = self.generate_fake_feature(Z)
                 mmd.append(calculate_mmd_rbf(torch.mean(fake_feature, dim=0).detach().cpu().numpy(),
-                                            torch.mean(data_feature, dim=0).detach().cpu().numpy()))
+                                             torch.mean(data_feature, dim=0).detach().cpu().numpy()))
                 for kk in range(self.g_rounds):
                     # Train Generator and Supervisor
                     self.train_one_iter_g(data_feature)
@@ -1469,4 +1637,3 @@ class TimeGAN2:
                 self.inference(iter)
         np.save("{}/mmd.npy".format(self.checkpoint_dir), np.asarray(avg_mmd))
         self.time_logger.info('Finish Joint Training')
-

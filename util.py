@@ -7,12 +7,14 @@ from torch.distributions.multivariate_normal import MultivariateNormal
 import torch
 from sklearn import metrics
 from scipy.special import lambertw
-#from mpmath import lambertw
+
+# from mpmath import lambertw
 
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import logging
 import argparse
+
 
 def evaluation(sampled_data, dataset, epoch):
     data = []
@@ -32,6 +34,7 @@ def evaluation(sampled_data, dataset, epoch):
         'color': 'blue',
         'name': gan_type
     })
+
 
 def add_handler(logger, handlers):
     for handler in handlers:
@@ -259,13 +262,13 @@ def normalize_per_sample(data_feature, data_attribute, data_feature_outputs,
                 if output.normalization == Normalization.MINUSONE_ONE:
                     additional_attribute_outputs.append(Output(
                         type_=OutputType.CONTINUOUS,
-                        dim=1,
+                        dim=2,
                         normalization=Normalization.MINUSONE_ONE,
                         is_gen_flag=False))
                 else:
                     additional_attribute_outputs.append(Output(
                         type_=OutputType.CONTINUOUS,
-                        dim=1,
+                        dim=2,
                         normalization=Normalization.ZERO_ONE,
                         is_gen_flag=False))
 
@@ -302,6 +305,60 @@ def normalize_per_sample(data_feature, data_attribute, data_feature_outputs,
         data_feature[i, len_feature:, :] = 0
     return data_feature, data_attribute, data_attribute_outputs, \
            real_attribute_mask
+
+
+# def normalize_per_sample(data_feature, data_attribute, data_feature_outputs,
+#                          data_attribute_outputs, eps=0.0001):
+#     # assume all samples have maximum length
+#     data_feature_min = np.amin(data_feature, axis=1)
+#     data_feature_max = np.amax(data_feature, axis=1)
+#
+#     additional_attribute = []
+#     additional_attribute_outputs = []
+#
+#     dim = 0
+#     for output in data_feature_outputs:
+#         if output.type_ == OutputType.CONTINUOUS:
+#             for _ in range(output.dim):
+#                 max_ = data_feature_max[:, dim] + 0.0001
+#                 min_ = data_feature_min[:, dim] - 0.0001
+#
+#                 additional_attribute.append((max_ + min_) / 2.0)
+#                 additional_attribute.append((max_ - min_) / 2.0)
+#                 additional_attribute_outputs.append(Output(
+#                     type_=OutputType.CONTINUOUS,
+#                     dim=1,
+#                     normalization=output.normalization,
+#                     is_gen_flag=False))
+#                 additional_attribute_outputs.append(Output(
+#                     type_=OutputType.CONTINUOUS,
+#                     dim=1,
+#                     normalization=Normalization.ZERO_ONE,
+#                     is_gen_flag=False))
+#
+#                 max_ = np.expand_dims(max_, axis=1)
+#                 min_ = np.expand_dims(min_, axis=1)
+#
+#                 data_feature[:, :, dim] = \
+#                     (data_feature[:, :, dim] - min_) / (max_ - min_)
+#                 if output.normalization == Normalization.MINUSONE_ONE:
+#                     data_feature[:, :, dim] = \
+#                         data_feature[:, :, dim] * 2.0 - 1.0
+#
+#                 dim += 1
+#         else:
+#             dim += output.dim
+#
+#     real_attribute_mask = ([True] * len(data_attribute_outputs) +
+#                            [False] * len(additional_attribute_outputs))
+#
+#     additional_attribute = np.stack(additional_attribute, axis=1)
+#     data_attribute = np.concatenate(
+#         [data_attribute, additional_attribute], axis=1)
+#     data_attribute_outputs.extend(additional_attribute_outputs)
+#
+#     return data_feature, data_attribute, data_attribute_outputs, \
+#            real_attribute_mask
 
 
 def normalize_per_sample_split(path, nr_samples, data_feature_outputs, data_attribute_outputs, eps=1e-4):

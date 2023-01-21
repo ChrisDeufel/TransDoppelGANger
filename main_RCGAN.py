@@ -1,7 +1,7 @@
 from torch.utils.data import DataLoader
 import torch
 from data import Data
-from trainer import DoppelGANger, CGAN, RCGAN, NAIVEGAN, TimeGAN, TimeGAN2
+from trainer import DoppelGANger, CGAN, RCGAN, NAIVEGAN, TimeGAN, TimeGAN2, RCGAN2
 import os
 from util import options_parser
 
@@ -22,7 +22,7 @@ def main():
     if ks is not None:
         checkpoint_dir = "{}_ks_{}".format(checkpoint_dir, ks)
     if args.dis_type is None:
-        checkpoint_dir = '{}/{}/1'.format(checkpoint_dir, gan_type)
+        checkpoint_dir = '{}/{}/5'.format(checkpoint_dir, gan_type)
     else:
         checkpoint_dir = '{}/Gen_{}_Dis_{}/1'.format(checkpoint_dir, gan_type, dis_type)
 
@@ -43,10 +43,9 @@ def main():
     epoch = args.num_epochs
     save_frequency = args.save_frequency
     if gan_type == 'RCGAN' or gan_type == 'RGAN':
-        is_conditional = args.is_conditional
         trainer = RCGAN(real_train_dl, device=device, checkpoint_dir=checkpoint_dir,
-                        time_logging_file=time_logging_file, batch_size=batch_size,
-                        config_logging_file=config_logging_file, isConditional=is_conditional)
+                         time_logging_file=time_logging_file, batch_size=batch_size,
+                         config_logging_file=config_logging_file)
     elif gan_type == 'NaiveGAN':
         trainer = NAIVEGAN(real_train_dl, device=device, checkpoint_dir=checkpoint_dir, batch_size=batch_size,
                            time_logging_file=time_logging_file,
@@ -56,8 +55,8 @@ def main():
                        time_logging_file=time_logging_file, config_logging_file=config_logging_file)
     elif gan_type == 'TimeGAN':
         trainer = TimeGAN2(real_train_dl, device=device, checkpoint_dir=checkpoint_dir, batch_size=batch_size,
-                          config_logging_file=config_logging_file,
-                          time_logging_file=time_logging_file)
+                           config_logging_file=config_logging_file,
+                           time_logging_file=time_logging_file)
     else:
         trainer = DoppelGANger(real_train_dl=real_train_dl, device=device,
                                checkpoint_dir=checkpoint_dir, time_logging_file=time_logging_file,

@@ -31,7 +31,8 @@ class CGANGenerator(nn.Module):
         self.gen.apply(init_weights)
 
     def forward(self, x):
-        return self.gen(x)
+        x = self.gen(x)
+        return x
 
 
 class CGANDiscriminator(nn.Module):

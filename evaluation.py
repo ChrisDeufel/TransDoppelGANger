@@ -3,7 +3,6 @@ import statistics
 import random
 from scipy import stats
 from sklearn import metrics
-import pandas as pd
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -182,7 +181,12 @@ def autocorrelation(dir, data, data_feature_output, n_lags, partial=False):
                         continue
 
                 else:
-                    auto += autocorr(data_feature[i, :len_seq+1], n_lags)
+
+                    auto_sample = autocorr(data_feature[i, :len_seq+1], n_lags)
+                    if np.isnan(auto_sample).any():
+                        print(counter)
+                        continue
+                    auto += auto_sample
                     counter += 1
             if counter != 0:
                 auto /= counter
@@ -355,6 +359,51 @@ def plot_distribution_2(data, file, title, normalization=None):
     plt.savefig('{0}.png'.format(file))
 
 
+# def measurement_distribution(dir, data, feature_output, nr_bins=100):
+#     dim = 0
+#     counter = 0
+#     for f in feature_output:
+#         if f.type_ == output.OutputType.DISCRETE:
+#             dim += f.dim
+#             continue
+#         data_to_plot = []
+#         for set in data:
+#             data_feature = set['data_feature']
+#             data_gen_flag = set['data_gen_flag']
+#             bins = np.zeros(nr_bins)
+#             for j in range(len(data_feature)):
+#                 feature = data_feature[j, :np.count_nonzero(data_gen_flag[j, :]), dim]
+#                 # max = feature.max()
+#                 # min = feature.min()
+#                 # value = (max + min) / 2
+#                 for value in feature:
+#                     if f.normalization == output.Normalization.ZERO_ONE:
+#                         bin = int(value * nr_bins)
+#                         if bin < 0:
+#                             bin = 0
+#                         if bin >= nr_bins:
+#                             bins[nr_bins - 1] += 1
+#                         else:
+#                             bins[bin] += 1
+#                     else:
+#                         if value >= 0:
+#                             bin = int((value * (nr_bins / 2)) + (nr_bins / 2))
+#                         else:
+#                             bin = int((value + 1) * (nr_bins / 2))
+#                         if bin >= nr_bins:
+#                             bins[nr_bins - 1] += 1
+#                         elif bin < 0:
+#                             bins[0] += 1
+#                         else:
+#                             bins[bin] += 1
+#             data_to_plot.append({'bins': bins, 'name': set['name'], 'color': set['color']})
+#         dim += f.dim
+#         file = "{0}/meas_dis_feature_{1}".format(dir, counter)
+#         plot_distribution(data=data_to_plot, file=file,
+#                           title="measurement_distribution", normalization=f.normalization)
+#         counter += 1
+
+
 def measurement_distribution(dir, data, feature_output, nr_bins=100):
     dim = 0
     counter = 0
@@ -368,36 +417,29 @@ def measurement_distribution(dir, data, feature_output, nr_bins=100):
             data_gen_flag = set['data_gen_flag']
             bins = np.zeros(nr_bins)
             for j in range(len(data_feature)):
-                feature = data_feature[j, :np.count_nonzero(data_gen_flag[j, :]), dim]
-                # max = feature.max()
-                # min = feature.min()
-                # value = (max + min) / 2
-                for value in feature:
-                    if f.normalization == output.Normalization.ZERO_ONE:
-                        bin = int(value * nr_bins)
-                        if bin < 0:
-                            bin = 0
-                        if bin >= nr_bins:
-                            bins[nr_bins - 1] += 1
-                        else:
-                            bins[bin] += 1
+                feature = data_feature[j, :, dim]
+                max = feature.max()
+                min = feature.min()
+                value = (max + min) / 2
+                # value = np.mean(feature)
+                # for value in feature:
+                if f.normalization == output.Normalization.ZERO_ONE:
+                    bin = int(value * nr_bins)
+                    bins[bin] +=1
+                else:
+                    if value >= 0:
+                        bin = int((value * (nr_bins / 2)) + (nr_bins / 2))
                     else:
-                        if value >= 0:
-                            bin = int((value * (nr_bins / 2)) + (nr_bins / 2))
-                        else:
-                            bin = int((value + 1) * (nr_bins / 2))
-                        if bin >= nr_bins:
-                            bins[nr_bins - 1] += 1
-                        elif bin < 0:
-                            bins[0] += 1
-                        else:
-                            bins[bin] += 1
+                        bin = int((value + 1) * (nr_bins / 2))
+                    bins[bin] += 1
             data_to_plot.append({'bins': bins, 'name': set['name'], 'color': set['color']})
         dim += f.dim
         file = "{0}/meas_dis_feature_{1}".format(dir, counter)
         plot_distribution(data=data_to_plot, file=file,
                           title="measurement_distribution", normalization=f.normalization)
         counter += 1
+
+
 
 
 def metadata_distribution(dir, data, attribute_output):
@@ -631,7 +673,7 @@ fake_data = True
 w_lambert = False
 kernel_smoothing = None
 
-datasets = [{'name': "FCC_MBA", 'auto': [(15, False), (8, True)]}]
+datasets = [{'name': "web", 'auto': [(50, False)]}]
 """
 datasets = [
     {'name': "index_growth_range_1mo", 'auto': [(15, False), (8, True)]},
@@ -639,9 +681,10 @@ datasets = [
     {'name': "index_growth_range_12mo", 'auto': [(200, False), (150, True)]}
     ]
 """
-eval_metrics = ['auto', 'measurement', 'metadata', 'embedding', 'QQ', 'NN']
+eval_metrics = ['metadata', 'auto', 'NN', 'QQ', 'NN']
+# eval_metrics = ['auto']
 normalize = True
-gan_types = ['NaiveGAN']
+gan_types = ['Gen_TRANSFORMER_Dis_MLP']
 embedding_metrics = ['TSNE', 'PCA']
 qq_metrics = ['mean', 'variance', 'skewness', 'kurtosis']
 
@@ -653,7 +696,7 @@ for dataset in datasets:
     if normalize:
         (data_feature, data_attribute, data_attribute_outputs, real_attribute_mask) = \
             normalize_per_sample(data_feature, data_attribute, data_feature_outputs, data_attribute_outputs,
-                                 data_gen_flag, w_lambert=w_lambert, ks=kernel_smoothing)
+                                 data_gen_flag)
     data = []
     # append real data
     data.append({
@@ -670,7 +713,7 @@ for dataset in datasets:
         eval_dir = "{}_ks_{}".format(eval_dir, kernel_smoothing)
     if fake_data:
         for gan_type in gan_types:
-            for i in range(2, 3):
+            for i in range(1, 2):
                 for n in range(0, 420, 20):
                     sample_path = 'runs/{}/{}/{}/checkpoint/epoch_{}/generated_samples.npz'.format(dataset['name'],
                                                                                                    gan_type, i, n)
