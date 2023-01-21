@@ -1,7 +1,7 @@
 from torch.utils.data import DataLoader
 import torch
 from data import Data
-from trainer import DoppelGANger, CGAN, RCGAN, NAIVEGAN, TimeGAN, TimeGAN2, RCGAN2
+from trainer import TTSGAN
 import os
 from util import options_parser
 
@@ -42,26 +42,10 @@ def main():
     # define Hyperparameters
     epoch = args.num_epochs
     save_frequency = args.save_frequency
-    if gan_type == 'RCGAN' or gan_type == 'RGAN':
-        trainer = RCGAN(real_train_dl, device=device, checkpoint_dir=checkpoint_dir,
-                         time_logging_file=time_logging_file, batch_size=batch_size,
-                         config_logging_file=config_logging_file)
-    elif gan_type == 'NaiveGAN':
-        trainer = NAIVEGAN(real_train_dl, device=device, checkpoint_dir=checkpoint_dir, batch_size=batch_size,
-                           time_logging_file=time_logging_file,
-                           config_logging_file=config_logging_file)
-    elif gan_type == 'CGAN':
-        trainer = CGAN(real_train_dl, device=device, batch_size=batch_size, checkpoint_dir=checkpoint_dir,
-                       time_logging_file=time_logging_file, config_logging_file=config_logging_file)
-    elif gan_type == 'TimeGAN':
-        trainer = TimeGAN2(real_train_dl, device=device, checkpoint_dir=checkpoint_dir, batch_size=batch_size,
-                           config_logging_file=config_logging_file,
-                           time_logging_file=time_logging_file)
-    else:
-        trainer = DoppelGANger(real_train_dl=real_train_dl, device=device,
-                               checkpoint_dir=checkpoint_dir, time_logging_file=time_logging_file,
-                               config_logging_file=config_logging_file, sample_len=sample_len, batch_size=batch_size,
-                               gen_type=gan_type, dis_type=dis_type)
+
+    trainer = TTSGAN(real_train_dl=real_train_dl, device=device,
+                     checkpoint_dir=checkpoint_dir, time_logging_file=time_logging_file,
+                     config_logging_file=config_logging_file, batch_size=batch_size, sample_len=sample_len)
 
     trainer.train(epochs=epoch, writer_frequency=1, saver_frequency=save_frequency)
 

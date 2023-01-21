@@ -20,7 +20,7 @@ sys.modules["output"] = output
 np.seterr(divide='ignore', invalid='ignore')
 
 
-### QQ Plot ###
+# QQ Plot
 def plot_qq_plot(data, file, metric):
     fig, axes = plt.subplots(1, 1, figsize=(12, 4))
     m_max = np.max((data[0]["feature_metric"], data[1]["feature_metric"]))
@@ -60,7 +60,7 @@ def qq_plot(dir, data, data_feature_output, metric='mean'):
         plot_qq_plot(data=data_to_plot, file=file, metric=metric)
 
 
-### TSNE/ PCA Embedding ###
+# TSNE/ PCA Embedding
 def plot_embedding(data, file, embedding):
     fig, axes = plt.subplots(1, 1, figsize=(12, 4))
     counter = 0
@@ -96,7 +96,7 @@ def embedding(dir, data, data_feature_output, embedding='TSNE'):
         plot_embedding(data=data_to_plot, file=file, embedding=embedding)
 
 
-### WASSERSTEIN DISTANCE ###
+# WASSERSTEIN DISTANCE
 def emd(dir, data, data_feature_output, epoch):
     """
     args:
@@ -123,7 +123,7 @@ def emd(dir, data, data_feature_output, epoch):
         feature_dim += f.dim
 
 
-### AUTOCORRELATION ###
+# AUTOCORRELATION
 def part_autocorr(x, nlags):
     return sm.tsa.pacf(x, nlags=nlags)
 
@@ -203,7 +203,7 @@ def autocorrelation(dir, data, data_feature_output, n_lags, partial=False):
         feature_dim += f.dim
 
 
-### SEQUENCE LENGTH ###
+# SEQUENCE LENGTH
 def plot_seq_len(data, file):
     fig, axes = plt.subplots(1, 1, figsize=(12, 4))
     for set in data:
@@ -231,7 +231,7 @@ def sequence_length(dir, data):
     plot_seq_len(data_to_plot, file)
 
 
-### PEARSON CORRELATION ###
+# PEARSON CORRELATION
 # calculate pearson coefficient
 def pearson(x, y):
     return stats.pearsonr(x, y)
@@ -635,7 +635,7 @@ def nearest_neighbors(dir, real_data_features, sampled_data_features, data_featu
                                feature_dim=f)
 
 
-### RESOURCE COSTS ###
+# RESOURCE COSTS
 def mean_square_error(x, y):
     return metrics.mean_squared_error(x, y)
 
@@ -673,7 +673,7 @@ fake_data = True
 w_lambert = False
 kernel_smoothing = None
 
-datasets = [{'name': "web", 'auto': [(50, False)]}]
+datasets = [{'name': "FCC_MBA", 'auto': [(50, False)]}]
 """
 datasets = [
     {'name': "index_growth_range_1mo", 'auto': [(15, False), (8, True)]},
@@ -681,10 +681,10 @@ datasets = [
     {'name': "index_growth_range_12mo", 'auto': [(200, False), (150, True)]}
     ]
 """
-eval_metrics = ['metadata', 'auto', 'NN', 'QQ', 'NN']
+eval_metrics = ['auto']
 # eval_metrics = ['auto']
 normalize = True
-gan_types = ['Gen_TRANSFORMER_Dis_MLP']
+gan_types = ['TTSGAN']
 embedding_metrics = ['TSNE', 'PCA']
 qq_metrics = ['mean', 'variance', 'skewness', 'kurtosis']
 
