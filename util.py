@@ -6,15 +6,82 @@ import pickle
 from torch.distributions.multivariate_normal import MultivariateNormal
 import torch
 from sklearn import metrics
+from scipy.special import lambertw
+
+# from mpmath import lambertw
 
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import logging
+import argparse
 
 
-def add_handler(handlers, logger):
+def evaluation(sampled_data, dataset, epoch):
+    data = []
+    # append real data
+    data.append({
+        'data_feature': dataset.data_feature,
+        'data_attribute': dataset.data_attribute,
+        'data_gen_flag': dataset.data_gen_flag,
+        'color': 'yellow',
+        'name': 'REAL'
+    })
+    data.append({
+        'data_feature': sampled_data['sampled_features'],
+        'data_attribute': sampled_data['sampled_attributes'],
+        'data_gen_flag': sampled_data['sampled_gen_flags'],
+        'data_lengths': sampled_data['sampled_lengths'],
+        'color': 'blue',
+        'name': gan_type
+    })
+
+
+def add_handler(logger, handlers):
     for handler in handlers:
         logger.addHandler(handler)
+
+
+def setup_logging(time_logging_file, config_logging_file):
+    # SET UP LOGGING
+    config_logger = logging.getLogger("config_logger")
+    config_logger.setLevel(logging.INFO)
+    # config_logger.setLevel(logging.INFO)
+    time_logger = logging.getLogger("time_logger")
+    time_logger.setLevel(logging.INFO)
+    # time_logger.setLevel(logging.INFO)
+    # set up time handler
+    time_formatter = logging.Formatter('%(asctime)s:%(message)s')
+    time_handler = logging.FileHandler(time_logging_file)
+    time_handler.setLevel(logging.INFO)
+    time_handler.setFormatter(time_formatter)
+    stream_handler = logging.StreamHandler()
+    stream_handler.setLevel(logging.INFO)
+    stream_handler.setFormatter(time_formatter)
+    add_handler(time_logger, [time_handler, stream_handler])
+    # setup config handler
+    config_formatter = logging.Formatter('%(message)s')
+    config_handler = logging.FileHandler(config_logging_file)
+    config_handler.setLevel(logging.INFO)
+    config_handler.setFormatter(config_formatter)
+    config_logger.addHandler(config_handler)
+    return config_logger, time_logger
+
+
+def options_parser():
+    parser = argparse.ArgumentParser(description='Train a GAN to generate sequential, real-valued data.')
+    parser.add_argument('-da', '--dataset', help='name of dataset', type=str, default='FCC_MBA')
+    parser.add_argument('-wl', '--w_lambert', help='data should be w lambert transformed', type=bool, default=False)
+    parser.add_argument('-ks', '--kernel_smoothing', help='window size for kernel smoothing', type=int, default=None)
+    parser.add_argument('-gt', '--gan_type', help='name of GAN', type=str, default='RNN')
+    parser.add_argument('-dt', '--dis_type', help='discriminator type', type=str, default=None)
+    parser.add_argument('-sl', '--sample_len', help='sample length for DoppelGANger', type=int, default=1)
+    parser.add_argument('-bs', '--batch_size', help='Minibatch size', type=int, default=20)
+    parser.add_argument('-nd', '--noise_dim', help='Dimension of random Input Noise', type=int, default=20)
+    parser.add_argument('-ep', '--num_epochs', help='Number of Epochs to train', type=int, default=401)
+    parser.add_argument('-ic', '--is_conditional', help='For RC GAN', type=bool, default=False)
+    parser.add_argument('-dv', '--device', help='Run on GPU or CPU', type=str, default='cpu')
+    parser.add_argument('-sf', '--save_frequency', help='every x epoch to save model parameters', type=int, default=20)
+    return parser
 
 
 def setup_logger(name, log_file, formatter, level=logging.INFO):
@@ -25,6 +92,7 @@ def setup_logger(name, log_file, formatter, level=logging.INFO):
     logger.setLevel(level)
     logger.addHandler(handler)
     return logger
+
 
 def draw_attribute(data, outputs, path=None):
     if isinstance(data, list):
@@ -155,8 +223,20 @@ def renormalize_per_sample(data_feature, data_attribute, data_feature_outputs,
     return data_feature, data_attribute
 
 
+def kernel_smoothing(x, ks):
+    y = np.zeros_like(x)
+    for i in range(len(x)):
+        if i - int(ks / 2) < 0:
+            y[i] = np.mean(x[:ks])
+        elif i + int(ks / 2) > (len(x) - 1):
+            y[i] = np.mean(x[-ks:])
+        else:
+            y[i] = np.mean(x[i - int(ks / 2):i + int(ks / 2)])
+    return y
+
+
 def normalize_per_sample(data_feature, data_attribute, data_feature_outputs,
-                         data_attribute_outputs, data_gen_flag, eps=0.001):
+                         data_attribute_outputs, data_gen_flag, eps=0.0001, w_lambert=True, ks=None):
     # assume all samples have maximum length
     data_feature_min = np.zeros((data_feature.shape[0], data_feature.shape[2]))
     data_feature_max = np.zeros((data_feature.shape[0], data_feature.shape[2]))
@@ -179,16 +259,18 @@ def normalize_per_sample(data_feature, data_attribute, data_feature_outputs,
 
                 additional_attribute.append((max_ + min_) / 2.0)
                 additional_attribute.append((max_ - min_) / 2.0)
-                additional_attribute_outputs.append(Output(
-                    type_=OutputType.CONTINUOUS,
-                    dim=1,
-                    normalization=output.normalization,
-                    is_gen_flag=False))
-                additional_attribute_outputs.append(Output(
-                    type_=OutputType.CONTINUOUS,
-                    dim=1,
-                    normalization=Normalization.ZERO_ONE,
-                    is_gen_flag=False))
+                if output.normalization == Normalization.MINUSONE_ONE:
+                    additional_attribute_outputs.append(Output(
+                        type_=OutputType.CONTINUOUS,
+                        dim=2,
+                        normalization=Normalization.MINUSONE_ONE,
+                        is_gen_flag=False))
+                else:
+                    additional_attribute_outputs.append(Output(
+                        type_=OutputType.CONTINUOUS,
+                        dim=2,
+                        normalization=Normalization.ZERO_ONE,
+                        is_gen_flag=False))
 
                 max_ = np.expand_dims(max_, axis=1)
                 min_ = np.expand_dims(min_, axis=1)
@@ -211,12 +293,72 @@ def normalize_per_sample(data_feature, data_attribute, data_feature_outputs,
         [data_attribute, additional_attribute], axis=1)
     data_attribute_outputs.extend(additional_attribute_outputs)
 
+
+    if w_lambert:
+        data_feature = lambertw(data_feature).real
+    if ks is not None:
+        for i in range(len(data_feature)):
+            for d in range(data_feature.shape[2]):
+                data_feature[i, :, d] = kernel_smoothing(data_feature[i, :, d], ks)
     for i in range(len(data_feature)):
         len_feature = np.count_nonzero(data_gen_flag[i, :])
         data_feature[i, len_feature:, :] = 0
-
     return data_feature, data_attribute, data_attribute_outputs, \
            real_attribute_mask
+
+
+# def normalize_per_sample(data_feature, data_attribute, data_feature_outputs,
+#                          data_attribute_outputs, eps=0.0001):
+#     # assume all samples have maximum length
+#     data_feature_min = np.amin(data_feature, axis=1)
+#     data_feature_max = np.amax(data_feature, axis=1)
+#
+#     additional_attribute = []
+#     additional_attribute_outputs = []
+#
+#     dim = 0
+#     for output in data_feature_outputs:
+#         if output.type_ == OutputType.CONTINUOUS:
+#             for _ in range(output.dim):
+#                 max_ = data_feature_max[:, dim] + 0.0001
+#                 min_ = data_feature_min[:, dim] - 0.0001
+#
+#                 additional_attribute.append((max_ + min_) / 2.0)
+#                 additional_attribute.append((max_ - min_) / 2.0)
+#                 additional_attribute_outputs.append(Output(
+#                     type_=OutputType.CONTINUOUS,
+#                     dim=1,
+#                     normalization=output.normalization,
+#                     is_gen_flag=False))
+#                 additional_attribute_outputs.append(Output(
+#                     type_=OutputType.CONTINUOUS,
+#                     dim=1,
+#                     normalization=Normalization.ZERO_ONE,
+#                     is_gen_flag=False))
+#
+#                 max_ = np.expand_dims(max_, axis=1)
+#                 min_ = np.expand_dims(min_, axis=1)
+#
+#                 data_feature[:, :, dim] = \
+#                     (data_feature[:, :, dim] - min_) / (max_ - min_)
+#                 if output.normalization == Normalization.MINUSONE_ONE:
+#                     data_feature[:, :, dim] = \
+#                         data_feature[:, :, dim] * 2.0 - 1.0
+#
+#                 dim += 1
+#         else:
+#             dim += output.dim
+#
+#     real_attribute_mask = ([True] * len(data_attribute_outputs) +
+#                            [False] * len(additional_attribute_outputs))
+#
+#     additional_attribute = np.stack(additional_attribute, axis=1)
+#     data_attribute = np.concatenate(
+#         [data_attribute, additional_attribute], axis=1)
+#     data_attribute_outputs.extend(additional_attribute_outputs)
+#
+#     return data_feature, data_attribute, data_attribute_outputs, \
+#            real_attribute_mask
 
 
 def normalize_per_sample_split(path, nr_samples, data_feature_outputs, data_attribute_outputs, eps=1e-4):
@@ -391,7 +533,7 @@ def extract_len(data_gen_flag):
     return np.asarray(time), max_seq_len
 
 
-def NormMinMax(data):
+def norm_min_max(data):
     """Min-Max Normalizer.
 
     Args:

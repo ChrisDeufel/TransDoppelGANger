@@ -3,7 +3,6 @@ import statistics
 import random
 from scipy import stats
 from sklearn import metrics
-import pandas as pd
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -20,7 +19,8 @@ sys.modules["output"] = output
 
 np.seterr(divide='ignore', invalid='ignore')
 
-### QQ Plot ###
+
+# QQ Plot
 def plot_qq_plot(data, file, metric):
     fig, axes = plt.subplots(1, 1, figsize=(12, 4))
     m_max = np.max((data[0]["feature_metric"], data[1]["feature_metric"]))
@@ -38,11 +38,6 @@ def plot_qq_plot(data, file, metric):
 
 def qq_plot(dir, data, data_feature_output, metric='mean'):
     # create folder to save files
-    eval_dir = dir.rsplit("/", 1)[0]
-    epoch = dir.rsplit("/", 1)[1]
-    dir = "{0}/QQ-{1}".format(eval_dir, metric)
-    if not os.path.exists(dir):
-        os.makedirs(dir)
     feature_dim = 0
     for f in data_feature_output:
         if f.type_ == output.OutputType.DISCRETE:
@@ -61,15 +56,11 @@ def qq_plot(dir, data, data_feature_output, metric='mean'):
             else:
                 f_metric = stats.kurtosis(data_feature, axis=1)
             data_to_plot.append({"feature_metric": f_metric, "name": set['name'], "color": set['color']})
-        file = "{0}/feature_{1}".format(dir, feature_dim)
-        if not os.path.exists(file):
-            os.makedirs(file)
-        file = "{0}/{1}".format(file, epoch)
+        file = "{}/QQ_{}_feature_{}".format(dir, metric, feature_dim)
         plot_qq_plot(data=data_to_plot, file=file, metric=metric)
 
 
-
-### TSNE/ PCA Embedding ###
+# TSNE/ PCA Embedding
 def plot_embedding(data, file, embedding):
     fig, axes = plt.subplots(1, 1, figsize=(12, 4))
     counter = 0
@@ -87,12 +78,6 @@ def plot_embedding(data, file, embedding):
 
 
 def embedding(dir, data, data_feature_output, embedding='TSNE'):
-    # create folder to save files
-    eval_dir = dir.rsplit("/", 1)[0]
-    epoch = dir.rsplit("/", 1)[1]
-    dir = "{0}/{1}".format(eval_dir, embedding)
-    if not os.path.exists(dir):
-        os.makedirs(dir)
     feature_dim = 0
     for f in data_feature_output:
         if f.type_ == output.OutputType.DISCRETE:
@@ -107,27 +92,18 @@ def embedding(dir, data, data_feature_output, embedding='TSNE'):
             else:
                 f_embedded = PCA(n_components=2).fit_transform(data_feature)
             data_to_plot.append({"embedded_features": f_embedded, "name": set['name'], "color": set['color']})
-        file = "{0}/feature_{1}".format(dir, feature_dim)
-        if not os.path.exists(file):
-            os.makedirs(file)
-        file = "{0}/{1}".format(file, epoch)
+        file = "{}/{}_feature_{}".format(dir, embedding, feature_dim)
         plot_embedding(data=data_to_plot, file=file, embedding=embedding)
 
 
-### WASSERSTEIN DISTANCE ###
-def emd(dir, data, data_feature_output):
+# WASSERSTEIN DISTANCE
+def emd(dir, data, data_feature_output, epoch):
     """
     args:
     :param dataset: dataset name
     :param data: List of dictionaries (one dictionary per features with keys 'data feature', 'name' and 'color')
     :return: pass
     """
-    # create folder to save files
-    eval_dir = dir.rsplit("/", 1)[0]
-    epoch = dir.rsplit("/", 1)[1]
-    dir = "{0}/{1}".format(eval_dir, "emd")
-    if not os.path.exists(dir):
-        os.makedirs(dir)
     feature_dim = 0
     for f in data_feature_output:
         if f.type_ == output.OutputType.DISCRETE:
@@ -140,17 +116,14 @@ def emd(dir, data, data_feature_output):
             feature_mean = np.mean(data_feature, axis=0)
             data_to_plot.append({"feature_mean": feature_mean, "name": set['name'], "color": set['color']})
         emd = stats.wasserstein_distance(data_to_plot[0]['feature_mean'], data_to_plot[1]['feature_mean'])
-        file = "{0}/feature_{1}".format(dir, feature_dim)
-        if not os.path.exists(file):
-            os.makedirs(file)
-        file = "{0}/emds".format(file, epoch)
+        file = "{0}/emds_feature_{1}".format(dir, feature_dim)
         writer_file = open("{}.txt".format(file), "a")
         writer_file.write("{}: {}\n".format(epoch, emd))
         writer_file.close()
         feature_dim += f.dim
 
 
-### AUTOCORRELATION ###
+# AUTOCORRELATION
 def part_autocorr(x, nlags):
     return sm.tsa.pacf(x, nlags=nlags)
 
@@ -170,7 +143,7 @@ def plot_auto(data, file, partial):
         axes.set_title("Autocorrelation")
     # plt.xlim(1, len(data[0]["auto_data"]-2))
     plt.subplots_adjust(left=0.1, bottom=0.1, right=0.9, top=0.9)
-    plt.savefig("{0}.png".format(file))
+    plt.savefig("{}_nlags_{}.png".format(file, len(data[0]["auto_data"]) - 1))
 
 
 def autocorrelation(dir, data, data_feature_output, n_lags, partial=False):
@@ -180,16 +153,6 @@ def autocorrelation(dir, data, data_feature_output, n_lags, partial=False):
     :param data: List of dictionaries (one dictionary per features with keys 'data feature', 'name' and 'color')
     :return: pass
     """
-    # create folder to save files
-    eval_dir = dir.rsplit("/", 1)[0]
-    epoch = dir.rsplit("/", 1)[1]
-    if partial:
-        dir = "{0}/{1}".format(eval_dir, "partial_autocorrelation")
-    else:
-        dir = "{0}/{1}".format(eval_dir, "autocorrelation")
-    if not os.path.exists(dir):
-        os.makedirs(dir)
-    # dir = "{0}/{1}".format(dir, epoch)
     feature_dim = 0
     for f in data_feature_output:
         if f.type_ == output.OutputType.DISCRETE:
@@ -200,39 +163,47 @@ def autocorrelation(dir, data, data_feature_output, n_lags, partial=False):
             data_feature = set['data_feature']
             data_gen_flag = set['data_gen_flag']
             data_feature = data_feature[:, :, feature_dim]
-            # auto = np.apply_along_axis(func1d=autocorr, axis=1, arr=data_feature)
-            auto = np.zeros((0, n_lags + 1))
+            auto = 0
+            counter = 0
             for i in range(len(data_feature)):
                 len_seq = np.count_nonzero(data_gen_flag[i, :])
                 if partial:
-                    if len_seq < (n_lags * 2) + 2:
+                    if (len_seq//2) <= n_lags:
                         continue
                 else:
-                    if len_seq < n_lags + 1:
+                    if len_seq < n_lags:
                         continue
                 if partial:
                     try:
-                        auto = np.concatenate(
-                            (auto, np.expand_dims(part_autocorr(data_feature[i, :len_seq], n_lags), axis=0)),
-                            axis=0)
+                        auto += part_autocorr(data_feature[i, :len_seq + 1], n_lags)
+                        counter += 1
                     except np.linalg.LinAlgError:
                         continue
 
                 else:
-                    auto = np.concatenate((auto, np.expand_dims(autocorr(data_feature[i, :len_seq], n_lags), axis=0)),
-                                          axis=0)
-            auto = auto[~np.isnan(auto).any(axis=1), :]
-            data_avg_auto = np.mean(auto, axis=0)
-            data_to_plot.append({"auto_data": data_avg_auto, "name": set['name'], "color": set['color']})
-        file = "{0}/feature_{1}".format(dir, feature_dim)
-        if not os.path.exists(file):
-            os.makedirs(file)
-        file = "{0}/{1}".format(file, epoch)
+
+                    auto_sample = autocorr(data_feature[i, :len_seq+1], n_lags)
+                    if np.isnan(auto_sample).any():
+                        print(counter)
+                        continue
+                    auto += auto_sample
+                    counter += 1
+            if counter != 0:
+                auto /= counter
+            else:
+                auto = np.zeros(n_lags)
+            # autos = autos[~np.isnan(autos).any(axis=1), :]
+            # data_avg_auto = np.mean(autos, axis=0)
+            data_to_plot.append({"auto_data": auto, "name": set['name'], "color": set['color']})
+        if partial:
+            file = "{0}/partial_auto_feature_{1}".format(dir, feature_dim)
+        else:
+            file = "{0}/auto_feature_{1}".format(dir, feature_dim)
         plot_auto(data=data_to_plot, file=file, partial=partial)
         feature_dim += f.dim
 
 
-### SEQUENCE LENGTH ###
+# SEQUENCE LENGTH
 def plot_seq_len(data, file):
     fig, axes = plt.subplots(1, 1, figsize=(12, 4))
     for set in data:
@@ -250,23 +221,17 @@ def sequence_length(dir, data):
     :param data: List of dictionaries (one dictionary per features with keys 'data_gen_flag', 'name' and 'color')
     :return: pass
     """
-    # create folder to save files
-    eval_dir = dir.rsplit("/", 1)[0]
-    epoch = dir.rsplit("/", 1)[1]
-    dir = "{0}/{1}".format(eval_dir, "sequence_length")
-    if not os.path.exists(dir):
-        os.makedirs(dir)
     data_to_plot = []
     for set in data:
         data_gen_flag = set["data_gen_flag"]
         len = np.count_nonzero(data_gen_flag, axis=1)
         data_bins = np.bincount(len)
         data_to_plot.append({"data_bins": data_bins, "name": set['name'], "color": set['color']})
-    file = "{0}/epoch_{1}".format(dir, epoch)
+    file = "{0}/sequence_length".format(dir)
     plot_seq_len(data_to_plot, file)
 
 
-### PEARSON CORRELATION ###
+# PEARSON CORRELATION
 # calculate pearson coefficient
 def pearson(x, y):
     return stats.pearsonr(x, y)
@@ -284,7 +249,7 @@ def plot_cdf(data, file, normalization):
         else:
             X = np.linspace(0, 1, pdf.shape[0])
         axes.plot(X, Y, color=set['color'], label=set['name'])
-    axes.legend()
+
     if normalization is not None:
         x_ticks = range(0, len(pdf) + 1, int(len(pdf) / 4))
         if normalization == output.Normalization.ZERO_ONE:
@@ -292,6 +257,7 @@ def plot_cdf(data, file, normalization):
         else:
             x_labels = ['-1', '-0.5', '0', '0.5', '1']
         plt.xticks(x_ticks, x_labels)
+    axes.legend()
     axes.set_title("CDF")
     plt.savefig('{0}.png'.format(file))
 
@@ -305,12 +271,6 @@ def cross_measurement(dir, data, nr_bins):
     :param nr_bins:
     :return:
     """
-    # create folder to save files
-    eval_dir = dir.rsplit("/", 1)[0]
-    epoch = dir.rsplit("/", 1)[1]
-    dir = "{0}/{1}".format(eval_dir, "cross_meas_correlation")
-    if not os.path.exists(dir):
-        os.makedirs(dir)
     nr_features = data[0]['data_feature'].shape[2]
     for f_1 in range(nr_features):
         for f_2 in range(f_1 + 1, nr_features):
@@ -341,11 +301,8 @@ def cross_measurement(dir, data, nr_bins):
                         pearsons[bin] += 1
                 # pearsons /= data_feature.shape[0]
                 data_to_plot.append({"pdf": pearsons, 'name': set['name'], 'color': set['color']})
-            file = "{0}/feature{1}_feature{2}".format(dir, f_1, f_2)
-            if not os.path.exists(file):
-                os.makedirs(file)
-            file = "{0}/{1}".format(file, epoch)
-            plot_cdf(data=data_to_plot, file=file, normalization=output.Normalization.MINUSONE_ONE)
+            file = "{0}/cross_meas_feature{1}_feature{2}".format(dir, f_1, f_2)
+            plot_cdf(data=data_to_plot, file=file)
 
 
 ### PLOT MEASUREMENT DISTRIBUTION OR METADATA DISTRIBUTION ###
@@ -365,7 +322,11 @@ def plot_distribution(data, file, title, normalization=None):
             x_labels = ['0', '0.25', '0.5', '0.75', '1']
         else:
             x_labels = ['-1', '-0.5', '0', '0.5', '1']
-        plt.xticks(x_ticks, x_labels)
+
+    else:
+        x_ticks = np.arange(0, len(bins), 1)
+        x_labels = np.arange(1, len(bins)+1, 1)
+    plt.xticks(x_ticks, x_labels)
     plt.savefig('{0}.png'.format(file))
 
 
@@ -398,14 +359,52 @@ def plot_distribution_2(data, file, title, normalization=None):
     plt.savefig('{0}.png'.format(file))
 
 
+# def measurement_distribution(dir, data, feature_output, nr_bins=100):
+#     dim = 0
+#     counter = 0
+#     for f in feature_output:
+#         if f.type_ == output.OutputType.DISCRETE:
+#             dim += f.dim
+#             continue
+#         data_to_plot = []
+#         for set in data:
+#             data_feature = set['data_feature']
+#             data_gen_flag = set['data_gen_flag']
+#             bins = np.zeros(nr_bins)
+#             for j in range(len(data_feature)):
+#                 feature = data_feature[j, :np.count_nonzero(data_gen_flag[j, :]), dim]
+#                 # max = feature.max()
+#                 # min = feature.min()
+#                 # value = (max + min) / 2
+#                 for value in feature:
+#                     if f.normalization == output.Normalization.ZERO_ONE:
+#                         bin = int(value * nr_bins)
+#                         if bin < 0:
+#                             bin = 0
+#                         if bin >= nr_bins:
+#                             bins[nr_bins - 1] += 1
+#                         else:
+#                             bins[bin] += 1
+#                     else:
+#                         if value >= 0:
+#                             bin = int((value * (nr_bins / 2)) + (nr_bins / 2))
+#                         else:
+#                             bin = int((value + 1) * (nr_bins / 2))
+#                         if bin >= nr_bins:
+#                             bins[nr_bins - 1] += 1
+#                         elif bin < 0:
+#                             bins[0] += 1
+#                         else:
+#                             bins[bin] += 1
+#             data_to_plot.append({'bins': bins, 'name': set['name'], 'color': set['color']})
+#         dim += f.dim
+#         file = "{0}/meas_dis_feature_{1}".format(dir, counter)
+#         plot_distribution(data=data_to_plot, file=file,
+#                           title="measurement_distribution", normalization=f.normalization)
+#         counter += 1
+
+
 def measurement_distribution(dir, data, feature_output, nr_bins=100):
-    # create folder to save files
-    eval_dir = dir.rsplit("/", 1)[0]
-    epoch = dir.rsplit("/", 1)[1]
-    dir = "{0}/{1}".format(eval_dir, "measurement_distribution")
-    if not os.path.exists(dir):
-        os.makedirs(dir)
-    # dir = "{0}/{1}".format(dir, epoch)
     dim = 0
     counter = 0
     for f in feature_output:
@@ -415,41 +414,32 @@ def measurement_distribution(dir, data, feature_output, nr_bins=100):
         data_to_plot = []
         for set in data:
             data_feature = set['data_feature']
+            data_gen_flag = set['data_gen_flag']
             bins = np.zeros(nr_bins)
             for j in range(len(data_feature)):
                 feature = data_feature[j, :, dim]
-                # max = feature.max()
-                # min = feature.min()
-                # value = (max + min) / 2
-                for value in feature:
-                    if f.normalization == output.Normalization.ZERO_ONE:
-                        bin = int(value * nr_bins)
-                        if bin < 0:
-                            print('jj')
-                        if bin == nr_bins:
-                            bins[bin - 1] += 1
-                        else:
-                            bins[bin] += 1
+                max = feature.max()
+                min = feature.min()
+                value = (max + min) / 2
+                # value = np.mean(feature)
+                # for value in feature:
+                if f.normalization == output.Normalization.ZERO_ONE:
+                    bin = int(value * nr_bins)
+                    bins[bin] +=1
+                else:
+                    if value >= 0:
+                        bin = int((value * (nr_bins / 2)) + (nr_bins / 2))
                     else:
-                        if value >= 0:
-                            bin = int((value * (nr_bins / 2)) + (nr_bins / 2))
-                        else:
-                            bin = int((value + 1) * (nr_bins / 2))
-                        if bin >= nr_bins:
-                            bins[nr_bins - 1] += 1
-                        elif bin < 0:
-                            bins[0] += 1
-                        else:
-                            bins[bin] += 1
+                        bin = int((value + 1) * (nr_bins / 2))
+                    bins[bin] += 1
             data_to_plot.append({'bins': bins, 'name': set['name'], 'color': set['color']})
         dim += f.dim
-        file = "{0}/feature_{1}".format(dir, counter)
-        if not os.path.exists(file):
-            os.makedirs(file)
-        file = "{0}/{1}".format(file, epoch)
+        file = "{0}/meas_dis_feature_{1}".format(dir, counter)
         plot_distribution(data=data_to_plot, file=file,
                           title="measurement_distribution", normalization=f.normalization)
         counter += 1
+
+
 
 
 def metadata_distribution(dir, data, attribute_output):
@@ -459,13 +449,6 @@ def metadata_distribution(dir, data, attribute_output):
     :param dataset: name of the dataset
     :return: pass
     """
-    # create folder to save files
-    eval_dir = dir.rsplit("/", 1)[0]
-    epoch = dir.rsplit("/", 1)[1]
-    dir = "{0}/{1}".format(eval_dir, "metadata_distribution")
-    if not os.path.exists(dir):
-        os.makedirs(dir)
-    # dir = "{0}/{1}".format(dir, epoch)
     dim = 0
     counter = 0
     for i in attribute_output:
@@ -480,10 +463,7 @@ def metadata_distribution(dir, data, attribute_output):
             data_attribute = one_hot
             bins = np.sum(data_attribute, axis=0)
             data_to_plot.append({'bins': bins, 'name': set['name'], 'color': set['color']})
-        file = "{0}/attribute_{1}".format(dir, counter)
-        if not os.path.exists(file):
-            os.makedirs(file)
-        file = "{0}/{1}".format(file, epoch)
+        file = "{0}/meta_dis_attribute_{1}".format(dir, counter)
         plot_distribution(data=data_to_plot, file=file,
                           title="metadata_distribution")
         dim += i.dim
@@ -629,13 +609,6 @@ def plot_nearest_neighbors(data, file, real_data_features, sampled_data_features
 
 
 def nearest_neighbors(dir, real_data_features, sampled_data_features, data_feature_outputs):
-    # create folder to save files
-    eval_dir = dir.rsplit("/", 1)[0]
-    epoch = dir.rsplit("/", 1)[1]
-    dir = "{0}/{1}".format(eval_dir, "nearest_neighbor")
-    if not os.path.exists(dir):
-        os.makedirs(dir)
-    # dir = "{0}/{1}".format(dir, epoch)
     feature_dim = 0
     for f in range(len(data_feature_outputs)):
         if data_feature_outputs[f].type_ == output.OutputType.DISCRETE:
@@ -656,16 +629,13 @@ def nearest_neighbors(dir, real_data_features, sampled_data_features, data_featu
             # get indices with lowest mse
             dist_ind = np.argsort(dist)
             data_to_plot.append({"sample_index": sample_nr, "nn_indices": dist_ind})
-        file = "{0}/feature_{1}".format(dir, f)
-        if not os.path.exists(file):
-            os.makedirs(file)
-        file = "{0}/{1}".format(file, epoch)
+        file = "{0}/NN_feature_{1}".format(dir, f)
         plot_nearest_neighbors(data=data_to_plot, file=file,
                                real_data_features=real_data_features, sampled_data_features=sampled_data_features,
                                feature_dim=f)
 
 
-### RESOURCE COSTS ###
+# RESOURCE COSTS
 def mean_square_error(x, y):
     return metrics.mean_squared_error(x, y)
 
@@ -699,73 +669,136 @@ def mse_autocorrelation(dir, real_data_features, sample_data_features, data_feat
 
 
 # load web dataset for testing
-dataset_name = 'index_growth_range_3mo'
-gan_type = 'Gen_RNN_Dis_normal'
-# load original data
-(data_feature, data_attribute, data_gen_flag, data_feature_outputs, data_attribute_outputs) = \
-    load_data("data/{0}".format(dataset_name))
+fake_data = True
+w_lambert = False
+kernel_smoothing = None
+
+datasets = [{'name': "FCC_MBA", 'auto': [(50, False)]}]
+"""
 datasets = [
-            {'name': "index_growth_1mo", 'auto': [(15, False), (8, True)]},
-            {'name': "index_growth_3mo", 'auto': [(50, False), (20, True)]},
-            {'name': "index_growth_12mo", 'auto': [(200, False), (150, True)]},
-            {'name': "index_growth_range_1mo", 'auto': [(15, False), (8, True)]},
-            {'name': "index_growth_range_3mo", 'auto': [(50, False), (20, True)]},
-            {'name': "index_growth_range_12mo", 'auto': [(200, False), (150, True)]}
-            ]
+    {'name': "index_growth_range_1mo", 'auto': [(15, False), (8, True)]},
+    {'name': "index_growth_range_3mo", 'auto': [(50, False), (20, True)]},
+    {'name': "index_growth_range_12mo", 'auto': [(200, False), (150, True)]}
+    ]
+"""
+eval_metrics = ['auto']
+# eval_metrics = ['auto']
+normalize = True
+gan_types = ['TTSGAN']
+embedding_metrics = ['TSNE', 'PCA']
+qq_metrics = ['mean', 'variance', 'skewness', 'kurtosis']
 
-# if normalization needed
-(data_feature, data_attribute, data_attribute_outputs, real_attribute_mask) = \
-    normalize_per_sample(data_feature, data_attribute, data_feature_outputs, data_attribute_outputs, data_gen_flag)
-for i in range(1, 2):
-    for n in range(0, 400, 20):
-        sample_path = 'runs/{}/{}/{}/checkpoint/epoch_{}/generated_samples.npz'.format(dataset_name, gan_type, i, n)
-        sampled_data = np.load(sample_path)
-
-        sampled_features = sampled_data['sampled_features']
-        sampled_attributes = sampled_data['sampled_attributes']
-        sampled_gen_flags = sampled_data['sampled_gen_flags']
-        sampled_lengths = sampled_data['sampled_lengths']
-
-        # generate list of dictionaries
-        data = []
-        # append real data
-        data.append({
-            'data_feature': data_feature,
-            'data_attribute': data_attribute,
-            'data_gen_flag': data_gen_flag,
-            'color': 'yellow',
-            'name': 'REAL'
-        })
-        # append sampled data
-        data.append({
-            'data_feature': sampled_features,
-            'data_attribute': sampled_attributes,
-            'data_gen_flag': sampled_gen_flags,
-            'data_lengths': sampled_lengths,
-            'color': 'blue',
-            'name': 'torchDoppelGANger'
-        })
-        # create folder to save data
-        run_dir = "{}/{}".format(sample_path.split("/")[2], sample_path.split("/")[3])
-        epoch_id = sample_path.split("/")[5]
-        evaluation_dir = "evaluation/{0}/{1}".format(dataset_name, run_dir)
-        if not os.path.exists(evaluation_dir):
-            os.makedirs(evaluation_dir)
-        evaluation_dir = "{0}/{1}".format(evaluation_dir, epoch_id)
-
+for dataset in datasets:
+    # load original data
+    (data_feature, data_attribute, data_gen_flag, data_feature_outputs, data_attribute_outputs) = \
+        load_data("data/{0}".format(dataset['name']))
+    # if normalization needed
+    if normalize:
+        (data_feature, data_attribute, data_attribute_outputs, real_attribute_mask) = \
+            normalize_per_sample(data_feature, data_attribute, data_feature_outputs, data_attribute_outputs,
+                                 data_gen_flag)
+    data = []
+    # append real data
+    data.append({
+        'data_feature': data_feature,
+        'data_attribute': data_attribute,
+        'data_gen_flag': data_gen_flag,
+        'color': 'yellow',
+        'name': 'REAL'
+    })
+    eval_dir = "evaluation/{}".format(dataset['name'])
+    if w_lambert:
+        eval_dir = "{}_wl".format(eval_dir)
+    if kernel_smoothing is not None:
+        eval_dir = "{}_ks_{}".format(eval_dir, kernel_smoothing)
+    if fake_data:
+        for gan_type in gan_types:
+            for i in range(1, 2):
+                for n in range(0, 420, 20):
+                    sample_path = 'runs/{}/{}/{}/checkpoint/epoch_{}/generated_samples.npz'.format(dataset['name'],
+                                                                                                   gan_type, i, n)
+                    sampled_data = np.load(sample_path)
+                    sampled_features = sampled_data['sampled_features']
+                    sampled_attributes = sampled_data['sampled_attributes']
+                    sampled_gen_flags = sampled_data['sampled_gen_flags']
+                    sampled_lengths = sampled_data['sampled_lengths']
+                    # append sampled data
+                    data.append({
+                        'data_feature': sampled_features,
+                        'data_attribute': sampled_attributes,
+                        'data_gen_flag': sampled_gen_flags,
+                        'data_lengths': sampled_lengths,
+                        'color': 'blue',
+                        'name': gan_type
+                    })
+                    dir = "{}/{}/{}/epoch_{}".format(eval_dir, gan_type, i, n)
+                    if not os.path.exists(dir):
+                        os.makedirs(dir)
+                    # call methods
+                    if 'metadata' in eval_metrics:
+                        metadata_distribution(dir=dir, data=data, attribute_output=data_attribute_outputs)
+                    if 'seq_len' in eval_metrics:
+                        sequence_length(dir=dir, data=data)
+                    if 'cross_meas' in eval_metrics:
+                        cross_measurement(dir=dir, data=data, nr_bins=100)
+                    if 'measurement' in eval_metrics:
+                        measurement_distribution(dir=dir, data=data, feature_output=data_feature_outputs)
+                    if 'EMD' in eval_metrics:
+                        emd(dir=dir, data=data, data_feature_output=data_feature_outputs, epoch=n)
+                    if 'auto' in eval_metrics:
+                        for metric in dataset['auto']:
+                            partial = metric[1]
+                            if dataset['name'] == 'web' or dataset['name'] == 'FCC_MBA':
+                                if partial:
+                                    n_lags = (data[0]['data_feature'].shape[1] // 2) - 1
+                                else:
+                                    n_lags = data[0]['data_feature'].shape[1]
+                            else:
+                                n_lags = metric[0]
+                            autocorrelation(dir=dir, data=data, data_feature_output=data_feature_outputs,
+                                            n_lags=n_lags, partial=partial)
+                    if 'NN' in eval_metrics:
+                        nearest_neighbors(dir=dir, real_data_features=data_feature,
+                                          sampled_data_features=sampled_features,
+                                          data_feature_outputs=data_feature_outputs)
+                    if "meta_meas" in eval_metrics:
+                        meta_meas_corr(dir=dir, data=data, data_attribute_outputs=data_attribute_outputs,
+                                       data_feature_outputs=data_feature_outputs)
+                    if 'embedding' in eval_metrics:
+                        for metric in embedding_metrics:
+                            embedding(dir=dir, data=data, data_feature_output=data_feature_outputs,
+                                      embedding=metric)
+                    if 'QQ' in eval_metrics:
+                        for metric in qq_metrics:
+                            qq_plot(dir=dir, data=data, data_feature_output=data_feature_outputs, metric=metric)
+                    data.pop(-1)
+    else:
+        dir = "{}/only_real".format(eval_dir)
+        if not os.path.exists(dir):
+            os.makedirs(dir)
         # call methods
-        # metadata_distribution(dir=evaluation_dir, data=data, attribute_output=data_attribute_outputs)
-        # sequence_length(dir=evaluation_dir, data=data)
-        cross_measurement(dir=evaluation_dir, data=data, nr_bins=100)
-        # measurement_distribution(dir=evaluation_dir, data=data, feature_output=data_feature_outputs)
-        # emd(dir=evaluation_dir, data=data, data_feature_output=data_feature_outputs)
-        # autocorrelation(dir=evaluation_dir, data=data, data_feature_output=data_feature_outputs, n_lags=8,
-        #                 partial=True)
-        # nearest_neighbors(dir=evaluation_dir, real_data_features=data_feature, sampled_data_features=sampled_features,
-        #                   data_feature_outputs=data_feature_outputs)
+        if 'metadata' in eval_metrics:
+            metadata_distribution(dir=dir, data=data, attribute_output=data_attribute_outputs)
+        if 'seq_len' in eval_metrics:
+            sequence_length(dir=dir, data=data)
+        if 'cross_meas' in eval_metrics:
+            cross_measurement(dir=dir, data=data, nr_bins=100)
+        if 'measurement' in eval_metrics:
+            measurement_distribution(dir=dir, data=data, feature_output=data_feature_outputs)
+        if 'auto' in eval_metrics:
+            for metric in dataset['auto']:
+                partial = metric[1]
+                if dataset['name'] == 'web' or dataset['name'] == 'FCC_MBA':
+                    if partial:
+                        n_lags = (data[0]['data_feature'].shape[1] // 2) - 1
+                    else:
+                        n_lags = data[0]['data_feature'].shape[1]
+                else:
+                    n_lags = metric[0]
+                autocorrelation(dir=dir, data=data, data_feature_output=data_feature_outputs,
+                                n_lags=n_lags, partial=partial)
         # meta_meas_corr(dir=evaluation_dir, data=data, data_attribute_outputs=data_attribute_outputs,
         #                data_feature_outputs=data_feature_outputs)
-        # mse_autocorrelation(dir=evaluation_dir, real_data_features=data_feature, sample_data_features=sampled_features,
-        #                    data_feature_outputs=data_feature_outputs)
-        # embedding(dir=evaluation_dir, data=data, data_feature_output=data_feature_outputs, embedding='PCA')
-        # qq_plot(dir=evaluation_dir, data=data, data_feature_output=data_feature_outputs, metric='kurtosis')
+        if 'embedding' in eval_metrics:
+            for metric in embedding_metrics:
+                embedding(dir=dir, data=data, data_feature_output=data_feature_outputs, embedding=metric)

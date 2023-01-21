@@ -23,20 +23,10 @@ model.py: Network Modules
 import torch
 import torch.nn as nn
 import torch.nn.init as init
+from gan.gan_util import init_weights
 
 
-def _weights_init(m):
-    classname = m.__class__.__name__
-    if isinstance(m, nn.Linear) or isinstance(m, nn.Conv2d):
-        init.kaiming_normal_(m.weight)
-    elif classname.find('Conv') != -1:
-        m.weight.data.normal_(0.0, 0.02)
-    elif classname.find('BatchNorm') != -1:
-        m.weight.data.normal_(1.0, 0.02)
-        m.bias.data.fill_(0)
-
-
-class Encoder(nn.Module):
+class TGEncoder(nn.Module):
     """Embedding network between original feature space to latent space.
 
         Args:
@@ -48,11 +38,11 @@ class Encoder(nn.Module):
         """
 
     def __init__(self, input_size, hidden_dim=24, num_layer=3):
-        super(Encoder, self).__init__()
-        self.rnn = nn.GRU(input_size=input_size, hidden_size=hidden_dim, num_layers=num_layer)
+        super(TGEncoder, self).__init__()
+        self.rnn = nn.LSTM(input_size=input_size, hidden_size=hidden_dim, num_layers=num_layer, batch_first=True)
         self.fc = nn.Linear(hidden_dim, hidden_dim)
         self.sigmoid = nn.Sigmoid()
-        self.apply(_weights_init)
+        self.apply(init_weights)
 
     def forward(self, input, sigmoid=True):
         e_outputs, _ = self.rnn(input)
@@ -62,7 +52,7 @@ class Encoder(nn.Module):
         return H
 
 
-class Recovery(nn.Module):
+class TGRecovery(nn.Module):
     """Recovery network from latent space to original space.
 
     Args:
@@ -74,11 +64,12 @@ class Recovery(nn.Module):
     """
 
     def __init__(self, output_size, hidden_dim=24, num_layer=3):
-        super(Recovery, self).__init__()
-        self.rnn = nn.GRU(input_size=hidden_dim, hidden_size=output_size, num_layers=num_layer)
+        super(TGRecovery, self).__init__()
+        # self.rnn = nn.GRU(input_size=hidden_dim, hidden_size=output_size, num_layers=num_layer)
+        self.rnn = nn.LSTM(input_size=hidden_dim, hidden_size=output_size, num_layers=num_layer, batch_first=True)
         self.fc = nn.Linear(output_size, output_size)
         self.sigmoid = nn.Sigmoid()
-        self.apply(_weights_init)
+        self.apply(init_weights)
 
     def forward(self, input, sigmoid=True):
         r_outputs, _ = self.rnn(input)
@@ -88,7 +79,7 @@ class Recovery(nn.Module):
         return X_tilde
 
 
-class Generator(nn.Module):
+class TGGenerator(nn.Module):
     """Generator function: Generate time-series data in latent space.
 
     Args:
@@ -100,11 +91,12 @@ class Generator(nn.Module):
     """
 
     def __init__(self, z_dim=6, hidden_dim=24, num_layer=3):
-        super(Generator, self).__init__()
-        self.rnn = nn.GRU(input_size=z_dim, hidden_size=hidden_dim, num_layers=num_layer)
+        super(TGGenerator, self).__init__()
+        # self.rnn = nn.GRU(input_size=z_dim, hidden_size=hidden_dim, num_layers=num_layer)
+        self.rnn = nn.LSTM(input_size=z_dim, hidden_size=hidden_dim, num_layers=num_layer, batch_first=True)
         self.fc = nn.Linear(hidden_dim, hidden_dim)
         self.sigmoid = nn.Sigmoid()
-        self.apply(_weights_init)
+        self.apply(init_weights)
 
     def forward(self, input, sigmoid=True):
         g_outputs, _ = self.rnn(input)
@@ -114,7 +106,7 @@ class Generator(nn.Module):
         return E
 
 
-class Supervisor(nn.Module):
+class TGSupervisor(nn.Module):
     """Generate next sequence using the previous sequence.
 
     Args:
@@ -126,11 +118,12 @@ class Supervisor(nn.Module):
     """
 
     def __init__(self, hidden_dim=24, num_layer=3):
-        super(Supervisor, self).__init__()
-        self.rnn = nn.GRU(input_size=hidden_dim, hidden_size=hidden_dim, num_layers=num_layer)
+        super(TGSupervisor, self).__init__()
+        # self.rnn = nn.GRU(input_size=hidden_dim, hidden_size=hidden_dim, num_layers=num_layer)
+        self.rnn = nn.LSTM(input_size=hidden_dim, hidden_size=hidden_dim, num_layers=num_layer, batch_first=True)
         self.fc = nn.Linear(hidden_dim, hidden_dim)
         self.sigmoid = nn.Sigmoid()
-        self.apply(_weights_init)
+        self.apply(init_weights)
 
     def forward(self, input, sigmoid=True):
         s_outputs, _ = self.rnn(input)
@@ -140,7 +133,7 @@ class Supervisor(nn.Module):
         return S
 
 
-class Discriminator(nn.Module):
+class TGDiscriminator(nn.Module):
     """Discriminate the original and synthetic time-series data.
 
     Args:
@@ -152,11 +145,13 @@ class Discriminator(nn.Module):
     """
 
     def __init__(self, hidden_dim=24, num_layer=3):
-        super(Discriminator, self).__init__()
-        self.rnn = nn.GRU(input_size=hidden_dim, hidden_size=int(hidden_dim/2), num_layers=num_layer, bidirectional=True)
+        super(TGDiscriminator, self).__init__()
+        # self.rnn = nn.GRU(input_size=hidden_dim, hidden_size=int(hidden_dim/2), num_layers=num_layer, bidirectional=True)
+        self.rnn = nn.LSTM(input_size=hidden_dim, hidden_size=int(hidden_dim / 2), num_layers=num_layer,
+                          bidirectional=True, batch_first=True)
         self.fc = nn.Linear(hidden_dim, 1)
         self.sigmoid = nn.Sigmoid()
-        self.apply(_weights_init)
+        self.apply(init_weights)
 
     def forward(self, input, sigmoid=True):
         d_outputs, _ = self.rnn(input)

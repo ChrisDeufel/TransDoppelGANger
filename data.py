@@ -2,15 +2,15 @@ from torch.utils.data import Dataset
 import torch
 from load_data import load_data
 from util import add_gen_flag, add_gen_flag_split, normalize_per_sample, normalize_per_sample_split, extract_len, \
-    NormMinMax
+    norm_min_max
 import numpy as np
 import os
 import pickle
-import copy
 
 
 class Data(Dataset):
-    def __init__(self, sample_len, transforms=None, normalize=True, gen_flag=True, size=None, name='web'):
+    def __init__(self, sample_len, transforms=None, normalize=True, gen_flag=True, size=None, name='web',
+                 w_lambert=True, ks=3):
         (self.data_feature, self.data_attribute, self.data_gen_flag,
          self.data_feature_outputs, self.data_attribute_outputs) = load_data("data/{0}".format(name))
         self.transforms = transforms
@@ -25,15 +25,15 @@ class Data(Dataset):
             (self.data_feature, self.data_attribute, self.data_attribute_outputs,
              self.real_attribute_mask) = normalize_per_sample(self.data_feature, self.data_attribute,
                                                               self.data_feature_outputs, self.data_attribute_outputs,
-                                                              self.data_gen_flag)
+                                                              self.data_gen_flag, w_lambert=w_lambert, ks=ks)
 
         if gen_flag:
             self.data_feature, self.data_feature_outputs = add_gen_flag(self.data_feature, self.data_gen_flag,
                                                                         self.data_feature_outputs, sample_len)
         self.data_feature_shape = self.data_feature.shape
         self.data_attribute_shape = self.data_attribute.shape
-        np.save("data/{}/data_feature_n_g.npy".format(name), self.data_feature)
-        np.save("data/{}/data_attribute_n_g.npy".format(name), self.data_attribute)
+        # np.save("data/{}/data_feature_n_g.npy".format(name), self.data_feature)
+        # np.save("data/{}/data_attribute_n_g.npy".format(name), self.data_attribute)
 
     def __getitem__(self, idx):
         attribute = torch.Tensor(self.data_attribute[idx, :])
